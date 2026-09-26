@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils"
  * Each shape is "kind:args": rect x,y,w,h · circle cx,cy,r · dot cx,cy,r (filled) · path d.
  */
 const ICONS = {
+  overview: ["rect:4,4,7,9", "rect:13,4,7,5", "rect:4,15,7,5", "rect:13,11,7,9"],
   network: ["path:M6.5 17.5 L10 7 M11.8 6.8 L17 11 M8 18 L17 13", "circle:6,19,2", "circle:10.5,5.5,2", "circle:18.5,12,2.5"],
   communities: ["circle:9,10,5.5", "circle:16,15,5.5", "dot:8,9,0.9", "dot:17,16,0.9"],
   centrality: ["circle:12,12,3", "path:M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M18.4 5.6l-2.8 2.8M8.4 15.6l-2.8 2.8"],

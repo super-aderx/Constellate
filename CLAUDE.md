@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project status
 
-Constellate is a sales analytics platform focused on product network analysis (which products are bought together, clusters, central products), plus an AI layer ("Constella AI") that turns the network into strategy: answers, bundles, discount campaigns and slogans. `backend/` has a working FastAPI API. `frontend/constella-frontend/` has the marketing landing page only; it runs on sample data and doesn't call the API yet, and the AI features it shows are simulated (the agent isn't built). `plan.md` holds the full target design (Postgres warehouse built by dbt, React + Sigma.js frontend); it doesn't cover the AI features yet.
+Constellate is a sales analytics platform focused on product network analysis (which products are bought together, clusters, central products), plus an AI layer ("Constella AI") that turns the network into strategy: answers, bundles, discount campaigns and slogans. `backend/` has a working FastAPI API. `frontend/constella-frontend/` has the marketing landing page and the signed-in home page (at `#/home`, with a sidebar to the other pages, which are placeholders so far). Both run on mock data and don't call the API yet, and the AI features they show are simulated (the agent isn't built). `plan.md` holds the full target design (Postgres warehouse built by dbt, React + Sigma.js frontend); it doesn't cover the AI features yet.
 
 There is **no database yet**. The API reads from `app/sample_data.py`, an in-memory, deterministic (seeded) stand-in shaped like the planned dbt mart tables (`daily_orders`, `daily_product_stats`, `daily_pair_stats` with `product_a < product_b`). Its baskets are generated from themed product groups, so tests rely on those clusters showing up as communities.
 
@@ -53,7 +53,11 @@ Dependencies point downward only: `components/*` never import from `features/*`.
   - `graph/`: `ConstellationGraph` (SVG network; props for fixed `positions`, `interactive`, `labels`), `clusterLayout` / `pairsOf` (pure), `SkyDust`. Node/edge types are modelled on the API's `/network` response but use string ids and camelCase (`coOrders`); API data will need an adapter.
   - `assistant/`: `AskBar` (display-only), `CampaignCard`.
   - `charts/LiftDotPlot` (a real `<table>`; `marker="rocket"` option), `brand/` (`Logo`, `Icon`, `GenMark`, `Rocket`, `RocketGlyph`), `layout/Section`, `motion/CountUp`, `ui/` (shadcn).
-- `src/hooks/`: `useInView`, `useTimeline` (elapsed ms for scripted animations; restarts on a new `runKey`), `useMediaQuery`, `useScrolled`.
+  - `charts/WeekTrend` (a week on the sky as a line of stars; days are a radio group), `charts/RankList`, `assistant/DataRef` (a figure in generated text with a tooltip naming its source), `layout/AppShell` (sidebar that collapses to an icon rail from `md`, drawer below it).
+- `src/hooks/`: `useInView`, `useTimeline` (elapsed ms for scripted animations; restarts on a new `runKey`), `useMediaQuery`, `useScrolled`, `useHashRoute`.
+- Routing is hash-based with no router dependency: `#/<page>` opens the app (`features/app/AppPage`), anything else (including landing anchors like `#network`) shows the landing page.
+- `src/features/app/`: the signed-in frame (nav, account, placeholder pages); copy in its `content.ts`.
+- `src/features/home/`: the home page (7-day trend, AI overview, top sellers). Its `content.ts` holds the mock week; the AI overview's figures are written out, so they must match that data.
 - `src/features/landing/`: one file per section, composed in `LandingPage.tsx`. **All copy and sample data live in `content.ts`**; the sample network there is the same small grocery store everywhere (hero graph, chat demo, workflow, lift chart), so figures in copy must match its `edges`.
 
 ### Conventions

@@ -46,7 +46,9 @@
 
   --focus: #2a62c9;
   --positive: #1d7048;
+  --positive-soft: #e3f1e7;
   --negative: #b42a1f;
+  --negative-soft: #fbe3de;
 
   --comm-1: #2f6bd0;
   --comm-2: #0d8577;
@@ -92,7 +94,9 @@
 
   --focus: #6f9ff2;
   --positive: #5fc793;
+  --positive-soft: #0f2a1d;
   --negative: #ff8676;
+  --negative-soft: #3a1512;
 
   --comm-1: #6e9ff0;
   --comm-2: #3cc0ae;
@@ -219,6 +223,11 @@
   --color-star-ink: var(--star-ink);
   --color-focus: var(--focus);
   --color-positive: var(--positive);
+  --color-positive-soft: var(--positive-soft);
+  --color-negative: var(--negative);
+  --color-negative-soft: var(--negative-soft);
+  --color-star-light: var(--star-light);
+  --color-star-deep: var(--star-deep);
   --color-glow: var(--glow);
   --color-comm-1: var(--comm-1);
   --color-comm-2: var(--comm-2);
