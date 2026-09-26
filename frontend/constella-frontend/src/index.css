@@ -1,0 +1,355 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource-variable/inter";
+
+/*
+ * Constella theme
+ * 1. Constella tokens: Day on :root, Night on .dark / [data-theme="night"]
+ * 2. shadcn/ui variables mapped onto those tokens
+ * 3. @theme inline: every token becomes a Tailwind utility (bg-field, text-ink-muted, bg-comm-3 …)
+ *
+ * Night can be set on any subtree; the product graph always sets data-theme="night" on itself.
+ */
+
+@custom-variant dark (&:where(.dark, .dark *, [data-theme="night"], [data-theme="night"] *));
+
+/* ---------- 1. Constella tokens: Day ---------- */
+:root,
+[data-theme="day"] {
+  color-scheme: light;
+
+  /* Neutrals are tinted peach; navy (action, sky) is the counterweight */
+  --surface: #fbefe8;
+  --surface-raised: #fffaf7;
+  --field: #f6e0d4;
+  --sky: #131a2b;
+  --line: #efdad0;
+  --line-strong: #8f7b72;
+
+  --ink: #2a1e1a;
+  --ink-muted: #6e5c55;
+  --ink-faint: #8f7d75;
+
+  /* The soft peach glow behind the hero */
+  --glow: #ffd3bf;
+
+  --action: #1c2438;
+  --on-action: #ffffff;
+
+  /* Peach means "selected", and only that */
+  --star: #ec8664;
+  --star-light: #ffc3ab;
+  --star-deep: #d9654a;
+  --star-soft: #fcd6c4;
+  --star-ink: #9c3f24;
+
+  --focus: #2a62c9;
+  --positive: #1d7048;
+  --negative: #b42a1f;
+
+  --comm-1: #2f6bd0;
+  --comm-2: #0d8577;
+  --comm-3: #c62f3a;
+  --comm-4: #7b4fc6;
+  --comm-5: #56841c;
+  --comm-6: #c43c84;
+  --comm-7: #95592b;
+  --comm-8: #5f6e84;
+  --comm-rest: #b4b4ba;
+
+  --edge: rgba(42, 30, 26, 0.16);
+  --edge-strong: rgba(42, 30, 26, 0.55);
+
+  /* Elevation: sheets rise over the page, pop is for things that float above everything. Warm shadows. */
+  --elev-sheet: 0 -1px 0 rgba(120, 60, 36, 0.05), 0 -20px 48px -16px rgba(120, 60, 36, 0.16);
+  --elev-pop: 0 1px 2px rgba(120, 60, 36, 0.1), 0 16px 40px -8px rgba(120, 60, 36, 0.22);
+}
+
+/* ---------- 1. Constella tokens: Night ---------- */
+.dark,
+[data-theme="night"] {
+  color-scheme: dark;
+
+  --surface: #0d1015;
+  --surface-raised: #171b23;
+  --field: #232935;
+  --line: #262b35;
+  --line-strong: #646c7e;
+
+  --ink: #ece8df;
+  --ink-muted: #a2a6b0;
+  --ink-faint: #6f7480;
+
+  --action: #ece8df;
+  --on-action: #0d1015;
+
+  --star: #ffb59c;
+  --star-light: #ffd6c6;
+  --star-deep: #f28d6b;
+  --star-soft: #3a1f16;
+  --star-ink: #ffb59c;
+
+  --focus: #6f9ff2;
+  --positive: #5fc793;
+  --negative: #ff8676;
+
+  --comm-1: #6e9ff0;
+  --comm-2: #3cc0ae;
+  --comm-3: #f06470;
+  --comm-4: #a98cf2;
+  --comm-5: #8dc153;
+  --comm-6: #ec79b3;
+  --comm-7: #d5955e;
+  --comm-8: #98a3b8;
+  --comm-rest: #555d6d;
+
+  --edge: rgba(236, 232, 223, 0.14);
+  --edge-strong: rgba(236, 232, 223, 0.6);
+
+  --elev-sheet: 0 -1px 0 rgba(0, 0, 0, 0.4), 0 -20px 48px -16px rgba(0, 0, 0, 0.5);
+  --elev-pop: 0 1px 2px rgba(0, 0, 0, 0.5), 0 16px 40px -8px rgba(0, 0, 0, 0.55);
+}
+
+/* ---------- 2. shadcn/ui variables → Constella tokens ---------- */
+/* Declared on the same selectors so a nested data-theme re-resolves them. */
+:root,
+[data-theme="day"],
+.dark,
+[data-theme="night"] {
+  --radius: 6px; /* rounded-md 4px (controls), rounded-xl 8px (panels), rounded-2xl 14px (canvas) */
+
+  --background: var(--surface);
+  --foreground: var(--ink);
+  --card: var(--surface-raised);
+  --card-foreground: var(--ink);
+  --popover: var(--surface-raised);
+  --popover-foreground: var(--ink);
+
+  --primary: var(--action);
+  --primary-foreground: var(--on-action);
+  --secondary: var(--field);
+  --secondary-foreground: var(--ink);
+  --muted: var(--field);
+  --muted-foreground: var(--ink-muted);
+  --accent: var(--field); /* shadcn's hover fill, never peach */
+  --accent-foreground: var(--ink);
+  --destructive: var(--negative);
+
+  --border: var(--line);
+  --input: var(--line-strong);
+  --ring: var(--focus);
+
+  --chart-1: var(--comm-1);
+  --chart-2: var(--comm-2);
+  --chart-3: var(--comm-3);
+  --chart-4: var(--comm-4);
+  --chart-5: var(--comm-5);
+
+  --sidebar: var(--surface-raised);
+  --sidebar-foreground: var(--ink);
+  --sidebar-primary: var(--action);
+  --sidebar-primary-foreground: var(--on-action);
+  --sidebar-accent: var(--field);
+  --sidebar-accent-foreground: var(--ink);
+  --sidebar-border: transparent;
+  --sidebar-ring: var(--focus);
+}
+
+/* ---------- 3. Tailwind utilities ---------- */
+@theme inline {
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 2px);
+  --radius-2xl: calc(var(--radius) + 8px);
+
+  --shadow-sheet: var(--elev-sheet);
+  --shadow-pop: var(--elev-pop);
+
+  /* shadcn */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Constella */
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-field: var(--field);
+  --color-sky: var(--sky);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-ink-faint: var(--ink-faint);
+  --color-action: var(--action);
+  --color-on-action: var(--on-action);
+  --color-star: var(--star);
+  --color-star-soft: var(--star-soft);
+  --color-star-ink: var(--star-ink);
+  --color-focus: var(--focus);
+  --color-positive: var(--positive);
+  --color-glow: var(--glow);
+  --color-comm-1: var(--comm-1);
+  --color-comm-2: var(--comm-2);
+  --color-comm-3: var(--comm-3);
+  --color-comm-4: var(--comm-4);
+  --color-comm-5: var(--comm-5);
+  --color-comm-6: var(--comm-6);
+  --color-comm-7: var(--comm-7);
+  --color-comm-8: var(--comm-8);
+  --color-comm-rest: var(--comm-rest);
+  --color-edge: var(--edge);
+  --color-edge-strong: var(--edge-strong);
+
+  /* The graph's entrance: stars appear, then the pairs draw in */
+  --animate-star-in: star-in 560ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  --animate-edge-draw: edge-draw 720ms ease-out both;
+  /* Selecting a product: its star pops and a light runs along each of its pairs */
+  --animate-star-pop: star-pop 460ms cubic-bezier(0.3, 1.6, 0.5, 1) both;
+  --animate-signal: signal 820ms cubic-bezier(0.4, 0, 0.2, 1) both;
+
+  /* Workflow: a packet travels along each link; bars grow from zero */
+  --animate-packet-x: packet-x 700ms cubic-bezier(0.4, 0, 0.2, 1) both;
+  --animate-packet-y: packet-y 700ms cubic-bezier(0.4, 0, 0.2, 1) both;
+  --animate-grow-x: grow-x 900ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+
+  @keyframes packet-x {
+    from {
+      left: 0%;
+    }
+    85% {
+      opacity: 1;
+    }
+    to {
+      left: 100%;
+      opacity: 0;
+    }
+  }
+  @keyframes packet-y {
+    from {
+      top: 0%;
+    }
+    85% {
+      opacity: 1;
+    }
+    to {
+      top: 100%;
+      opacity: 0;
+    }
+  }
+  @keyframes grow-x {
+    from {
+      transform: scaleX(0);
+    }
+  }
+  @keyframes star-pop {
+    from {
+      transform: scale(0.55);
+    }
+  }
+  @keyframes signal {
+    from {
+      stroke-dashoffset: 0.14;
+    }
+    80% {
+      opacity: 1;
+    }
+    to {
+      stroke-dashoffset: -1;
+      opacity: 0;
+    }
+  }
+
+  @keyframes star-in {
+    from {
+      opacity: 0;
+      transform: scale(0.3);
+    }
+  }
+  @keyframes edge-draw {
+    from {
+      stroke-dashoffset: 1;
+    }
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html {
+    @apply font-sans;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-size: 17px;
+    line-height: 1.55;
+    letter-spacing: -0.011em;
+  }
+  /* One focus style for links and custom controls; shadcn controls bring their own ring */
+  :focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+/*
+ * The hero sinks back as the sheet scrolls over it. Wide screens only: on phones the hero is
+ * taller than the screen and would fade while still being read. Browsers without scroll timelines skip it.
+ */
+@keyframes recede {
+  to {
+    transform: translateY(6%) scale(0.95);
+    opacity: 0.35;
+  }
+}
+@supports (animation-timeline: scroll()) {
+  @media (prefers-reduced-motion: no-preference) and (min-width: 1024px) {
+    .recede-on-scroll {
+      transform-origin: 50% 0%;
+      animation: recede linear both;
+      animation-timeline: scroll(root);
+      animation-range: 0 90vh;
+    }
+  }
+}
