@@ -15,7 +15,7 @@ brew install uv    # Python package/env manager for backend/
 brew install prek  # git hook runner (Rust rewrite of pre-commit)
 ```
 
-The frontend needs Node 20+ and uses npm (there's a `package-lock.json`; `plan.md` says pnpm, but npm is what's in use).
+The frontend needs Node 22.12+ (`@rolldown/plugin-babel` requires it) and uses npm (there's a `package-lock.json`; `plan.md` says pnpm, but npm is what's in use).
 
 ## Backend (`backend/`)
 
@@ -50,7 +50,7 @@ Requests flow **routes → services → repository**:
 Dependencies point downward only: `components/*` never import from `features/*`.
 - `src/index.css`: the whole theme. Constella tokens (Day on `:root`, Night on `.dark` / `[data-theme="night"]`), shadcn variables mapped onto them, and `@theme inline` so every token is a Tailwind utility (`bg-surface`, `text-ink-muted`, `bg-sky`, `bg-star-soft`, `shadow-pop`, `bg-comm-3` …). Custom keyframes (`star-in`, `edge-draw`, `signal`, `packet-x/y`, `grow-x`, `recede`) live here too.
 - `src/components/`: reusable, text-free pieces.
-  - `graph/`: `ConstellationGraph` (SVG network; props for fixed `positions`, `interactive`, `labels`), `clusterLayout` / `pairsOf` (pure), `SkyDust`. Node/edge types mirror the API's `/network` response.
+  - `graph/`: `ConstellationGraph` (SVG network; props for fixed `positions`, `interactive`, `labels`), `clusterLayout` / `pairsOf` (pure), `SkyDust`. Node/edge types are modelled on the API's `/network` response but use string ids and camelCase (`coOrders`); API data will need an adapter.
   - `assistant/`: `AskBar` (display-only), `CampaignCard`.
   - `charts/LiftDotPlot` (a real `<table>`; `marker="rocket"` option), `brand/` (`Logo`, `Icon`, `GenMark`, `Rocket`, `RocketGlyph`), `layout/Section`, `motion/CountUp`, `ui/` (shadcn).
 - `src/hooks/`: `useInView`, `useTimeline` (elapsed ms for scripted animations; restarts on a new `runKey`), `useMediaQuery`, `useScrolled`.

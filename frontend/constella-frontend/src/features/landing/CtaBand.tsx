@@ -17,8 +17,9 @@ export function CtaBand() {
             {cta.title}
           </h2>
           <p className="mt-4 text-pretty text-on-action/75">{cta.body}</p>
-          <Button asChild size="lg" variant="secondary" className={cn("mt-8", largeButton)}>
-            <a href={requestAccess.href}>{requestAccess.label}</a>
+          {/* Demo only: there's no sign-up flow yet, so the button does nothing */}
+          <Button type="button" size="lg" variant="secondary" className={cn("mt-8", largeButton)}>
+            {requestAccess.label}
           </Button>
         </div>
         {/* The rocket rises in along its trail, up and to the right */}

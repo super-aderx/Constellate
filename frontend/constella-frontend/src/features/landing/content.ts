@@ -41,21 +41,22 @@ export const communities: Community[] = [
   { community: 3, label: "Game day" },
 ]
 
-export const nodes: ProductNode[] = [
-  { id: "milk", label: "Whole Milk", category: "Dairy", community: 0, strength: 3120 },
-  { id: "eggs", label: "Eggs (12)", category: "Dairy", community: 0, strength: 2210 },
-  { id: "yogurt", label: "Greek Yogurt", category: "Dairy", community: 0, strength: 1320 },
-  { id: "butter", label: "Butter", category: "Dairy", community: 0, strength: 990 },
-  { id: "coffee", label: "Ground Coffee", category: "Pantry", community: 1, strength: 2480 },
-  { id: "filters", label: "Coffee Filters", category: "Pantry", community: 1, strength: 610 },
-  { id: "oat", label: "Oat Milk", category: "Pantry", community: 1, strength: 880 },
-  { id: "pasta", label: "Spaghetti", category: "Pantry", community: 2, strength: 1530 },
-  { id: "sauce", label: "Tomato Sauce", category: "Pantry", community: 2, strength: 1450 },
-  { id: "parmesan", label: "Parmesan", category: "Dairy", community: 2, strength: 860 },
-  { id: "basil", label: "Fresh Basil", category: "Produce", community: 2, strength: 420 },
-  { id: "chips", label: "Tortilla Chips", category: "Snacks", community: 3, strength: 1010 },
-  { id: "salsa", label: "Salsa", category: "Snacks", community: 3, strength: 830 },
-  { id: "guac", label: "Guacamole", category: "Snacks", community: 3, strength: 450 },
+/** Strength is derived from `edges` below, so node size always matches the pairs shown. */
+const products: Omit<ProductNode, "strength">[] = [
+  { id: "milk", label: "Whole Milk", category: "Dairy", community: 0 },
+  { id: "eggs", label: "Eggs (12)", category: "Dairy", community: 0 },
+  { id: "yogurt", label: "Greek Yogurt", category: "Dairy", community: 0 },
+  { id: "butter", label: "Butter", category: "Dairy", community: 0 },
+  { id: "coffee", label: "Ground Coffee", category: "Pantry", community: 1 },
+  { id: "filters", label: "Coffee Filters", category: "Pantry", community: 1 },
+  { id: "oat", label: "Oat Milk", category: "Pantry", community: 1 },
+  { id: "pasta", label: "Spaghetti", category: "Pantry", community: 2 },
+  { id: "sauce", label: "Tomato Sauce", category: "Pantry", community: 2 },
+  { id: "parmesan", label: "Parmesan", category: "Dairy", community: 2 },
+  { id: "basil", label: "Fresh Basil", category: "Produce", community: 2 },
+  { id: "chips", label: "Tortilla Chips", category: "Snacks", community: 3 },
+  { id: "salsa", label: "Salsa", category: "Snacks", community: 3 },
+  { id: "guac", label: "Guacamole", category: "Snacks", community: 3 },
 ]
 
 export const edges: ProductEdge[] = [
@@ -75,6 +76,11 @@ export const edges: ProductEdge[] = [
   { source: "salsa", target: "guac", lift: 3.3, coOrders: 90 },
   { source: "eggs", target: "parmesan", lift: 1.3, coOrders: 60 },
 ]
+
+export const nodes: ProductNode[] = products.map((p) => ({
+  ...p,
+  strength: edges.reduce((sum, e) => (e.source === p.id || e.target === p.id ? sum + (e.coOrders ?? 0) : sum), 0),
+}))
 
 export const defaultSelectedId = "coffee"
 

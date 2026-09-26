@@ -1,4 +1,7 @@
-/** Shapes follow the API's /network response, so real data can replace the samples as-is. */
+/**
+ * View models for the graph, modelled on the API's /network response but not identical to it:
+ * the API sends numeric ids and snake_case fields (`co_orders`), so API data needs an adapter.
+ */
 
 /** A product in the co-purchase network. */
 export interface ProductNode {
