@@ -1,6 +1,6 @@
 import { RankList } from "@/components/charts/RankList"
 import { fmt } from "@/lib/format"
-import { Change } from "./Change"
+import { Change } from "@/components/charts/Change"
 import { topSellers } from "./content"
 
 /** The week's five best sellers by revenue, each with its community's dot and change. */

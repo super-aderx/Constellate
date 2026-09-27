@@ -146,7 +146,7 @@ export const overview = {
       ],
     },
   ] satisfies { signal: Signal; text: Segment[] }[],
-  primary: { label: "Draft a Pasta night discount", href: "#/campaigns" },
+  primary: { label: "Draft a Pasta night discount", href: "#/ask?q=Design%20a%20discount%20campaign%20for%20Pasta%20night" },
   secondary: { label: "Ask a follow-up", href: "#/ask" },
 }
 

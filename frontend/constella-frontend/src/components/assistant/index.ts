@@ -1,3 +1,7 @@
 export { AskBar } from "./AskBar"
 export { CampaignCard, type Campaign } from "./CampaignCard"
+export { Composer } from "./Composer"
 export { DataRef } from "./DataRef"
+export { GenText, type Segment } from "./GenText"
+export { QueryTrace, type TraceStep } from "./QueryTrace"
+export { SuggestedQuestions } from "./SuggestedQuestions"

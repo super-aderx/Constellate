@@ -81,7 +81,7 @@ export function AppShell({ nav, current, labels, footer, children }: AppShellPro
         {/* Sidebar, md and up */}
         <aside
           className={cn(
-            "sticky top-0 hidden h-dvh shrink-0 flex-col bg-surface-raised transition-[width] duration-200 ease-out motion-reduce:transition-none md:flex",
+            "sticky top-0 hidden h-dvh shrink-0 flex-col bg-surface-raised transition-[width] duration-200 ease-out motion-reduce:transition-none md:flex print:hidden",
             collapsed ? "w-[68px]" : "w-60",
           )}
         >
@@ -123,7 +123,7 @@ export function AppShell({ nav, current, labels, footer, children }: AppShellPro
         <div className="flex min-w-0 flex-1 flex-col">
           {/* Top bar with the drawer, below md */}
           <Dialog.Root open={drawerOpen} onOpenChange={setDrawerOpen}>
-            <div className="sticky top-0 z-30 flex h-14 items-center gap-2 bg-surface/85 px-2 backdrop-blur-lg md:hidden">
+            <div className="sticky top-0 z-30 flex h-14 items-center gap-2 bg-surface/85 px-2 backdrop-blur-lg md:hidden print:hidden">
               <Dialog.Trigger
                 aria-label={labels.openMenu}
                 className="inline-flex size-10 cursor-pointer items-center justify-center rounded-xl text-ink hover:bg-field"
