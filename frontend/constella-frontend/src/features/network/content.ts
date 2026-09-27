@@ -99,6 +99,7 @@ export const pair = {
 
 export const communityTable = {
   title: "Communities in this view",
+  note: "Figures cover the products shown. Revenue follows the period and customers; the 4-week trend is weekly sales from all customers.",
   caption: "Communities, their size, sales and strongest pair",
   community: "Community",
   products: "Products",

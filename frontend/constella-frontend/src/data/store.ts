@@ -351,9 +351,13 @@ export function recentChange(values: number[]) {
   return last / (before || 1) - 1
 }
 
+/** Weekly revenue summed over some products. */
+export function seriesOf(ids: string[]): number[] {
+  return weeks.map((_, i) => sum(ids.map((id) => series[id].revenue[i])))
+}
+
 export function communitySeries(community: number): number[] {
-  const members = products.filter((p) => p.community === community)
-  return weeks.map((_, i) => sum(members.map((p) => series[p.id].revenue[i])))
+  return seriesOf(products.filter((p) => p.community === community).map((p) => p.id))
 }
 
 export const totals = {

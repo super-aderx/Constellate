@@ -4,7 +4,8 @@ export const report = {
   documentTitle: "Business report",
   kind: "Generated report",
   title: (store: string) => `Business report for ${store}`,
-  scope: (range: string, segment: string) => `Pairs and communities: ${range}, ${segment.toLowerCase()}. Sales: the 12 weeks to Sep 26.`,
+  scope: (range: string, segment: string) =>
+    `Pairs, communities and bridges: ${range}, ${segment.toLowerCase()}. Sales trends: the 12 weeks to Sep 26, all customers.`,
   generated: (asOf: string) => `Data as of ${asOf}`,
   back: "Back to Constella AI",
   print: "Print or save as PDF",
@@ -34,8 +35,12 @@ export const report = {
   nearChance: (a: string, b: string) => `${a} and ${b} are bought together often, but close to chance: popular, not paired.`,
 
   communitiesTitle: "Communities",
+  communitiesBody: (range: string, segment: string) =>
+    `Products and revenue for ${range}, ${segment.toLowerCase()}. The change compares the last 4 weeks of sales with the 4 before, for all customers.`,
   community: "Community",
   products: "Products",
+  periodRevenue: "Revenue in the period",
+  trend: "Last 4 weeks",
 
   bridgesTitle: "Bridge products",
   bridgesBody: "Each is the only link between part of your store and the rest. If one runs out, that part stops being bought with everything else.",

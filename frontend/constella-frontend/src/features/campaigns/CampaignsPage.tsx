@@ -36,7 +36,8 @@ export function CampaignsPage({ params }: { params: URLSearchParams }) {
   const shown = campaigns.filter((c) => inFilter(c, filter))
   const current = campaigns.find((c) => c.id === selected) ?? null
 
-  const live = campaigns.filter((c) => c.status === "active" || c.status === "paused")
+  // Paused campaigns aren't running, so the live totals leave them out (the Live filter still lists them).
+  const live = campaigns.filter((c) => c.status === "active")
   const liveTotals = live.reduce(
     (t, c) => {
       if (!c.results) return t

@@ -25,7 +25,8 @@ export function AskPage({ params }: { params: URLSearchParams }) {
   const linked = params.get("q")
 
   const send = (q: string) => {
-    ask(q, prefersReducedMotion() ? 500 : 1200)
+    // The pause only simulates reading; with reduced motion the answer is shown finished.
+    ask(q, prefersReducedMotion() ? 0 : 1200)
     requestAnimationFrame(() => endRef.current?.scrollIntoView({ behavior: prefersReducedMotion() ? "auto" : "smooth", block: "end" }))
   }
 

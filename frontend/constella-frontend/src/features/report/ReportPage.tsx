@@ -120,14 +120,14 @@ export function ReportPage({ params }: { params: URLSearchParams }) {
           )}
         </Section>
 
-        <Section title={copy.communitiesTitle}>
+        <Section title={copy.communitiesTitle} body={copy.communitiesBody(r.period.range, r.segment.label)}>
           <table className="w-full border-collapse text-[14px]">
             <thead>
               <tr className="text-left text-[12px] text-ink-muted">
                 <th scope="col" className="pb-2 font-medium">{copy.community}</th>
                 <th scope="col" className="pb-2 text-right font-medium">{copy.products}</th>
-                <th scope="col" className="pb-2 text-right font-medium">{copy.revenue}</th>
-                <th scope="col" className="pb-2 text-right font-medium">{copy.change}</th>
+                <th scope="col" className="pb-2 text-right font-medium">{copy.periodRevenue}</th>
+                <th scope="col" className="pb-2 text-right font-medium">{copy.trend}</th>
               </tr>
             </thead>
             <tbody>

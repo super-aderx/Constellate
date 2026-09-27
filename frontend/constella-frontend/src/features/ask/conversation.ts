@@ -46,13 +46,13 @@ function update(id: number, patch: Partial<Turn>) {
   emit()
 }
 
-/** Asks a question; the answer arrives after a short "reading" pause. Returns the turn's id. */
+/** Asks a question; the answer arrives after a short "reading" pause, or at once when `readMs` is 0. Returns the turn's id. */
 export function ask(question: string, readMs: number) {
   const id = nextId++
   const asked = { ...scope }
-  turns = [...turns, { id, question, scope: asked, answer: answer(question, asked), ready: false, sloganSet: 0 }]
+  turns = [...turns, { id, question, scope: asked, answer: answer(question, asked), ready: readMs <= 0, sloganSet: 0 }]
   emit()
-  setTimeout(() => update(id, { ready: true }), readMs)
+  if (readMs > 0) setTimeout(() => update(id, { ready: true }), readMs)
   return id
 }
 

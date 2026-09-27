@@ -4,7 +4,6 @@ import { articulationPoints, components } from "@/components/graph"
 import { summarise, type CampaignRecord } from "@/data/campaigns"
 import {
   communities,
-  communitySeries,
   getNetwork,
   periodById,
   productById,
@@ -12,6 +11,7 @@ import {
   recentChange,
   segmentById,
   series,
+  seriesOf,
   type PeriodId,
   type SegmentId,
 } from "@/data/store"
@@ -44,16 +44,19 @@ export function buildReport(periodId: PeriodId, segmentId: SegmentId, campaigns:
   const pairs: LiftRow[] = byLift.slice(0, 6).map((e) => ({ id: `${e.source}-${e.target}`, label: `${name(e.source)} and ${name(e.target)}`, lift: e.lift, coOrders: e.coOrders }))
   const nearChance = [...net.edges].filter((e) => e.lift < 1.8).sort((a, b) => b.coOrders - a.coOrders)[0]
 
+  // Products and revenue follow the period and customers (the scoped network); the 4-week trend is
+  // weekly sales of those products from all customers, since weekly sales aren't split by segment.
   const communityRows = communities
     .map((c) => {
-      const s = communitySeries(c.community)
+      const members = net.nodes.filter((n) => n.community === c.community)
       return {
         ...c,
-        products: products.filter((p) => p.community === c.community).length,
-        revenue: sum(s.slice(-4)),
-        change: recentChange(s),
+        products: members.length,
+        revenue: sum(members.map((n) => n.revenue)),
+        change: recentChange(seriesOf(members.map((n) => n.id))),
       }
     })
+    .filter((c) => c.products > 0)
     .sort((a, b) => b.revenue - a.revenue)
 
   const ids = net.nodes.map((n) => n.id)

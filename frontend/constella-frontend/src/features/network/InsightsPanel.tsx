@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react"
 import { GenText } from "@/components/assistant"
 import { GenMark } from "@/components/brand/GenMark"
+import { prefersReducedMotion } from "@/lib/motion"
 import { Button } from "@/components/ui/button"
 import { appHref } from "@/lib/route"
 import { cn } from "@/lib/utils"
@@ -19,14 +20,18 @@ const READ_MS = 650
 /**
  * Constella AI's reading of the graph in view. When the view changes (`readKey`), it shows a short
  * "reading" state before the new text, so it's clear the insight was redone for what's on screen.
+ * Reduced motion skips that state.
  */
 export function InsightsPanel({ insights, readKey, asOf, className }: { insights: Insights; readKey: string; asOf: string; className?: string }) {
+  const [reduced] = useState(prefersReducedMotion)
   const [doneKey, setDoneKey] = useState(readKey)
   useEffect(() => {
+    if (reduced) return
     const t = setTimeout(() => setDoneKey(readKey), READ_MS)
     return () => clearTimeout(t)
-  }, [readKey])
-  const reading = doneKey !== readKey
+  }, [readKey, reduced])
+  // With reduced motion the new reading shows finished, without the pause.
+  const reading = !reduced && doneKey !== readKey
 
   return (
     <aside aria-labelledby="insights-title" aria-busy={reading} className={cn("flex flex-col rounded-xl bg-surface-raised p-5", className)}>

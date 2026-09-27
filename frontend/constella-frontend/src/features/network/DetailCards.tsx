@@ -16,7 +16,7 @@ function Card({ label, onClose, children, className }: { label: string; onClose:
     <section
       aria-label={label}
       className={cn(
-        "flex flex-col gap-4 bg-surface-raised p-4 text-ink max-md:rounded-b-2xl md:absolute md:top-16 md:max-h-[calc(100%-5rem)] md:w-[19.5rem] md:overflow-y-auto md:rounded-xl md:shadow-pop",
+        "relative flex flex-col gap-4 bg-surface-raised p-4 text-ink max-md:rounded-b-2xl md:absolute md:top-16 md:max-h-[calc(100%-5rem)] md:w-[19.5rem] md:overflow-y-auto md:rounded-xl md:shadow-pop",
         "animate-in fade-in-0 slide-in-from-bottom-1 duration-200 motion-reduce:animate-none",
         className,
       )}

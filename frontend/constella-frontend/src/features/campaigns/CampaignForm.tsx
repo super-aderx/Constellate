@@ -31,7 +31,7 @@ interface CampaignFormProps {
 
 const MAX_PRODUCTS = 3
 
-/** Create, edit or schedule a campaign. Dates are required only when scheduling. */
+/** Create, edit or schedule a campaign. Dates are required when scheduling or editing a scheduled campaign. */
 export function CampaignForm({ mode, open, onOpenChange, initial, onSubmit }: CampaignFormProps) {
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
@@ -59,12 +59,14 @@ function Fields({ mode, initial, onSubmit }: { mode: FormMode; initial?: Partial
   const [slogans, setSlogans] = useState((initial?.slogans ?? []).join("\n"))
   const [tried, setTried] = useState(false)
 
+  // Dates are required when scheduling, and stay required when editing a campaign that's already scheduled.
+  const needsDates = mode === "schedule" || initial?.status === "scheduled"
   const errors = {
     name: !name.trim() ? copy.errors.name : null,
     offer: !offer.trim() ? copy.errors.offer : null,
     products: picked.length === 0 ? copy.errors.products : null,
-    start: mode === "schedule" && (!start || start < TODAY) ? copy.errors.past : null,
-    end: (mode === "schedule" && !end) || (start && end && end <= start) ? copy.errors.dates : null,
+    start: needsDates && (!start || start < TODAY) ? copy.errors.past : null,
+    end: (needsDates && !end) || (start && end && end <= start) ? copy.errors.dates : null,
   }
   const show = (k: keyof typeof errors) => (tried ? errors[k] : null)
 
