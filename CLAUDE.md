@@ -87,10 +87,10 @@ Install the hooks with `prek install`; run them on everything with `prek run --a
 
 ## CI (GitHub Actions)
 
-`.github/workflows/ci.yml` is the entry point: it runs on PRs into `main`, pushes to `main` and manually, and owns the triggers and concurrency. Its jobs run in parallel:
-- `hooks` (inline): `prek run --all-files` (pinned prek version), so CI enforces exactly what `prek.toml` lists. Add a check there and CI picks it up.
-- `backend` → `backend.yml` (reusable, `workflow_call`): `uv sync --locked` (fails if `uv.lock` is stale), `ruff check` (inline PR annotations), `ruff format --check`, `pytest`. Python comes from `backend/.python-version`.
+`.github/workflows/ci.yml` is the entry point: it runs on PRs into `main`, pushes to `main` and manually, and owns the triggers and concurrency (a new push cancels an in-progress PR run; runs on `main` are never cancelled). Its jobs run in parallel:
+- `hooks` (inline): `prek run --all-files` (pinned prek version) with `SKIP=ruff-check,ruff-format`, since `backend.yml` owns ruff. Any other hook added to `prek.toml` runs in CI automatically.
+- `backend` → `backend.yml` (reusable, `workflow_call`): `uv sync --locked` (fails if `uv.lock` is stale), `ruff check` (inline PR annotations), `ruff format --check`, `pytest`. Python comes from `backend/.python-version` (3.14, matching `requires-python`).
 - `frontend` → `frontend.yml` (reusable): Node 22, `npm ci`, `npm run lint`, `npm run build`.
-- `ci-passed` (job `ci-passes`): passes only if all of the above passed. It's the single check to require in branch protection, so jobs can be added or renamed without touching repo settings.
+- `ci-passes`: passes only if every job above succeeded (a skipped job fails it). It's the single check to require in branch protection, so jobs can be added or renamed without touching repo settings.
 
-`backend.yml` and `frontend.yml` also have `workflow_dispatch`, so either can be run alone from the Actions tab. Don't give them a `concurrency` block: one that matches the caller's group deadlocks.
+`backend.yml` and `frontend.yml` also have `workflow_dispatch`, so either can be run alone from the Actions tab. Don't give them a `concurrency` block: one that matches the caller's group deadlocks. Actions are pinned to commit SHAs with the release in a trailing comment (`# v7.0.1`); update both together.
