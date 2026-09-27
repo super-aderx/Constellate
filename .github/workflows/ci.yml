@@ -30,7 +30,7 @@ jobs:
 
       # backend.yml runs ruff (with PR annotations), so skip the ruff hooks here.
       - name: Run prek hooks
-        run: uvx prek@0.5.3 run --all-files --show-diff-on-failure
+        run: uvx --no-build prek@0.5.3 run --all-files --show-diff-on-failure
         env:
           SKIP: ruff-check,ruff-format
 

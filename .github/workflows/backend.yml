@@ -25,7 +25,7 @@ jobs:
         with:
           enable-cache: true
           cache-dependency-glob: backend/uv.lock
-      - run: uv sync --locked
-      - run: uv run ruff check --output-format=github
-      - run: uv run ruff format --check
-      - run: uv run pytest
+      - run: uv sync --locked --no-build
+      - run: uv run --locked --no-build ruff check --output-format=github
+      - run: uv run --locked --no-build ruff format --check
+      - run: uv run --locked --no-build pytest
