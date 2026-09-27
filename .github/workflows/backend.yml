@@ -1,0 +1,31 @@
+name: Backend
+
+# Called by ci.yml; can also be run on its own from the Actions tab.
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: ruff, pytest
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+      - run: uv sync --locked --no-build
+      - run: uv run --locked --no-build ruff check --output-format=github
+      - run: uv run --locked --no-build ruff format --check
+      - run: uv run --locked --no-build pytest

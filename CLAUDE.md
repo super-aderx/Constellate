@@ -81,6 +81,16 @@ Dependencies point downward only: `components/*` never import from `features/*`.
 `prek.toml` configures hooks run via `prek`:
 - `trailing-whitespace`, `end-of-file-fixer`, `check-added-large-files` (builtin hooks)
 - `ruff check --fix` and `ruff format`, triggered by changes under `backend/**/*.py`. They run as `uv run --directory backend ...` because the uv project lives in `backend/`, not the repo root.
-- Nothing runs on `frontend/` yet (no lint or format hook).
+- No hook runs on `frontend/` yet (no lint or format hook); CI lints and builds it.
 
 Install the hooks with `prek install`; run them on everything with `prek run --all-files`.
+
+## CI (GitHub Actions)
+
+`.github/workflows/ci.yml` is the entry point: it runs on PRs into `main`, pushes to `main` and manually, and owns the triggers and concurrency (a new push cancels an in-progress PR run; runs on `main` are never cancelled). Its jobs run in parallel:
+- `hooks` (inline): `prek run --all-files` (pinned prek version) with `SKIP=ruff-check,ruff-format`, since `backend.yml` owns ruff. Any other hook added to `prek.toml` runs in CI automatically.
+- `backend` → `backend.yml` (reusable, `workflow_call`): `uv sync --locked` (fails if `uv.lock` is stale), `ruff check` (inline PR annotations), `ruff format --check`, `pytest`. Python comes from `backend/.python-version` (3.14, matching `requires-python`).
+- `frontend` → `frontend.yml` (reusable): Node 22, `npm ci`, `npm run lint`, `npm run build`.
+- `ci-passes`: passes only if every job above succeeded (a skipped job fails it). It's the single check to require in branch protection, so jobs can be added or renamed without touching repo settings.
+
+`backend.yml` and `frontend.yml` also have `workflow_dispatch`, so either can be run alone from the Actions tab. Don't give them a `concurrency` block: one that matches the caller's group deadlocks. Actions are pinned to commit SHAs with the release in a trailing comment (`# v7.0.1`); update both together.
