@@ -1,14 +1,27 @@
-import { useEffect } from "react"
+import { lazy, Suspense, useEffect, type ReactNode } from "react"
 import { AppShell } from "@/components/layout/AppShell"
-import { Button } from "@/components/ui/button"
 import { HomePage } from "@/features/home/HomePage"
+import { parseRoute } from "@/lib/route"
 import { cn } from "@/lib/utils"
-import { account, backHome, dataStatus, documentTitle, nav, shellLabels, upcoming, upcomingNote } from "./content"
+import { account, dataStatus, documentTitle, nav, reportTitle, shellLabels } from "./content"
 
-/** The signed-in app for a hash route ("home", "network" …). Unknown routes show Home. */
+// Each page loads when first opened, so Home and the landing page stay light.
+const NetworkPage = lazy(() => import("@/features/network/NetworkPage").then((m) => ({ default: m.NetworkPage })))
+const ProductsPage = lazy(() => import("@/features/products/ProductsPage").then((m) => ({ default: m.ProductsPage })))
+const AskPage = lazy(() => import("@/features/ask/AskPage").then((m) => ({ default: m.AskPage })))
+const CampaignsPage = lazy(() => import("@/features/campaigns/CampaignsPage").then((m) => ({ default: m.CampaignsPage })))
+const ReportPage = lazy(() => import("@/features/report/ReportPage").then((m) => ({ default: m.ReportPage })))
+
+/**
+ * The signed-in app for a hash route ("home", "network?product=coffee" …). Unknown routes show Home.
+ * "communities" opens Network's community view (Communities lives inside Network); "report" is the
+ * business report, reached from Constella AI.
+ */
 export function AppPage({ route }: { route: string }) {
-  const current = nav.some((n) => n.id === route) ? route : "home"
-  const title = current === "home" ? nav[0].label : upcoming[current].title
+  const { page, params } = parseRoute(route)
+  if (page === "communities") params.set("view", "communities")
+  const current = page === "communities" ? "network" : page === "report" ? "report" : nav.some((n) => n.id === page) ? page : "home"
+  const title = current === "report" ? reportTitle : (nav.find((n) => n.id === current)?.label ?? nav[0].label)
 
   useEffect(() => {
     const before = document.title
@@ -19,9 +32,19 @@ export function AppPage({ route }: { route: string }) {
     }
   }, [title])
 
+  // Pages are keyed on the whole route, so a link with new parameters (?product=…) opens fresh.
+  const pages: Record<string, () => ReactNode> = {
+    home: () => <HomePage />,
+    network: () => <NetworkPage key={route} params={params} />,
+    products: () => <ProductsPage key={route} params={params} />,
+    ask: () => <AskPage key={route} params={params} />,
+    campaigns: () => <CampaignsPage key={route} params={params} />,
+    report: () => <ReportPage key={route} params={params} />,
+  }
+
   return (
-    <AppShell nav={nav} current={current} labels={shellLabels} footer={(collapsed) => <SidebarFooter collapsed={collapsed} />}>
-      {current === "home" ? <HomePage /> : <UpcomingPage {...upcoming[current]} />}
+    <AppShell nav={nav} current={current === "report" ? "ask" : current} labels={shellLabels} footer={(collapsed) => <SidebarFooter collapsed={collapsed} />}>
+      <Suspense fallback={null}>{pages[current]()}</Suspense>
     </AppShell>
   )
 }
@@ -53,35 +76,6 @@ function SidebarFooter({ collapsed }: { collapsed: boolean }) {
             <span className="truncate text-[12px] text-ink-muted">{account.store}</span>
           </span>
         )}
-      </div>
-    </div>
-  )
-}
-
-/** A sidebar page that isn't built yet: what it will show, and the way back. */
-function UpcomingPage({ title, body }: { title: string; body: string }) {
-  const pts = [
-    [12, 36],
-    [30, 14],
-    [52, 26],
-    [74, 10],
-    [86, 34],
-  ]
-  return (
-    <div className="mx-auto max-w-6xl px-4 pt-6 pb-12 md:px-8 md:pt-10">
-      <h1 className="text-[clamp(1.75rem,1.4rem+1.4vw,2.5rem)] leading-[1.1] font-bold tracking-[-0.035em]">{title}</h1>
-      <div className="mt-6 flex flex-col items-center rounded-xl bg-surface-raised px-6 py-16 text-center md:mt-8 md:py-24">
-        <svg viewBox="0 0 96 48" width={96} height={48} aria-hidden>
-          <path d="M12 36 L30 14 L52 26 L74 10 L86 34" fill="none" stroke="var(--line-strong)" strokeWidth={1.5} strokeDasharray="3 5" />
-          {pts.map(([x, y], i) => (
-            <circle key={i} cx={x} cy={y} r={3.5} fill="var(--field)" stroke="var(--line-strong)" strokeWidth={1.5} />
-          ))}
-        </svg>
-        <p className="mt-5 text-[21px] leading-7 font-semibold tracking-[-0.018em]">{upcomingNote}</p>
-        <p className="mt-2 max-w-[48ch] text-[15px] leading-6 text-ink-muted">{body}</p>
-        <Button asChild variant="secondary" className="mt-6 h-10 rounded-xl px-4">
-          <a href="#/home">{backHome}</a>
-        </Button>
       </div>
     </div>
   )

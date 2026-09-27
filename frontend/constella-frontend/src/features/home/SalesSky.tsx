@@ -2,7 +2,7 @@ import { useState } from "react"
 import { Tabs } from "radix-ui"
 import { WeekTrend } from "@/components/charts/WeekTrend"
 import { useMediaQuery } from "@/hooks/useMediaQuery"
-import { Change } from "./Change"
+import { Change } from "@/components/charts/Change"
 import { days, metrics, period, previousDays, trend, type MetricId } from "./content"
 
 const LATEST = days.length - 1
