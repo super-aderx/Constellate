@@ -4,6 +4,8 @@
 
 **Find the constellations in what you sell.**
 
+![image](images/landing_page_1.png)
+
 Constella is a sales-analytics app for shops. Most sales reports show *what* sells; Constella shows *what sells together*. It turns order history into a network of products: which pairs are bought together more often than chance, which products form natural groups ("communities"), and which products are the bridges holding the store's baskets together. On top of that network, **Constella AI** answers questions in plain words and drafts bundles, discount campaigns and slogans, with every figure traceable to the data.
 
 This repository holds the **API and the web app**. It's one of three repositories that make up the Constella platform (see [Architecture](#architecture)).
@@ -20,6 +22,9 @@ This repository holds the **API and the web app**. It's one of three repositorie
 | **Campaigns** | Draft, schedule, pause and end campaigns, and compare actual orders with the expected line. |
 
 Customer segments are RFM groups (champions, loyal, potential, new, at risk, hibernating), so every view can be filtered to, for example, what your champions buy together.
+
+![image](images/landing_page_3.png)
+![image](images/landing_page_4.png)
 
 ## Architecture
 
