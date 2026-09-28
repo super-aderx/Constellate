@@ -1,14 +1,17 @@
+import re
 from datetime import date
 
 import networkx as nx
 
 from app import repository as repo
-from app.repository import EdgeRow
+from app.db import Db
+from app.repository import EdgeRow, Product, ProductStats
 from app.schemas import (
     Centrality,
     CentralityItem,
     CentralityParams,
     Community,
+    CommunityRef,
     Edge,
     Network,
     NetworkFilters,
@@ -16,6 +19,7 @@ from app.schemas import (
     Node,
     ProductRef,
 )
+from app.services.money import dollars
 
 BETWEENNESS_EXACT_MAX_NODES = 500
 BETWEENNESS_SAMPLE_SIZE = 200
@@ -29,7 +33,7 @@ def build_graph(edges: list[EdgeRow]) -> nx.Graph:
     return g
 
 
-def detect_communities(g: nx.Graph) -> dict[int, int]:
+def detect_communities(g: nx.Graph) -> dict[str, int]:
     """Map node -> community id, ids ordered by community size (largest is 0)."""
     if g.number_of_nodes() == 0:
         return {}
@@ -38,39 +42,72 @@ def detect_communities(g: nx.Graph) -> dict[int, int]:
     return {node: idx for idx, members in enumerate(groups) for node in members}
 
 
-def _load(filters: NetworkFilters) -> tuple[date, date, list[EdgeRow], bool]:
-    start, end = repo.resolve_range(filters.start, filters.end)
+def community_label(members: list[str], names: dict[str, str]) -> str:
+    """A community's name from its two most connected products (members sorted by strength,
+    highest first). Communities aren't stored, so the label is generated with every response."""
+    return " & ".join(re.sub(r"\s*\(.*?\)", "", names[m]) for m in members[:2])
+
+
+def _members(
+    communities: dict[str, int], stats: dict[str, ProductStats]
+) -> dict[int, list[str]]:
+    """Community id -> members by revenue, highest first."""
+    members: dict[int, list[str]] = {}
+    for sku, cid in communities.items():
+        members.setdefault(cid, []).append(sku)
+
+    def by_revenue(sku: str) -> tuple[int, str]:
+        return (-(stats[sku].revenue_cents if sku in stats else 0), sku)
+
+    return {cid: sorted(m, key=by_revenue) for cid, m in sorted(members.items())}
+
+
+def _load(db: Db, filters: NetworkFilters) -> tuple[date, date, list[EdgeRow], bool]:
+    repo.require_segment(db, filters.segment)
+    start, end = repo.resolve_range(db, filters.start, filters.end)
     rows = repo.fetch_edges(
+        db,
         start,
         end,
         min_co_orders=filters.min_co_orders,
         min_lift=filters.min_lift,
-        category_id=filters.category_id,
+        segment=filters.segment,
+        category_id=str(filters.category_id) if filters.category_id else None,
         limit=filters.max_edges + 1,
     )
     truncated = len(rows) > filters.max_edges
     return start, end, rows[: filters.max_edges], truncated
 
 
-def get_network(filters: NetworkFilters) -> Network:
-    start, end, edges, truncated = _load(filters)
+def _names(products: dict[str, Product]) -> dict[str, str]:
+    return {sku: p.name for sku, p in products.items()}
+
+
+def _label(g: nx.Graph, members: list[str], names: dict[str, str]) -> str:
+    by_strength = sorted(members, key=lambda s: (-g.degree(s, weight="co_orders"), s))
+    return community_label(by_strength, names)
+
+
+def get_network(db: Db, filters: NetworkFilters) -> Network:
+    start, end, edges, truncated = _load(db, filters)
     g = build_graph(edges)
     communities = detect_communities(g)
-    stats = repo.product_stats(start, end)
-    products = repo.get_products(list(g.nodes))
+    stats = repo.product_stats(db, start, end, filters.segment)
+    products = repo.get_products(db, list(g.nodes))
+    names = _names(products)
 
     nodes = [
         Node(
-            id=pid,
-            label=products[pid].name,
-            category=repo.category_name(products[pid].category_id),
-            orders=stats[pid].n_orders,
-            revenue=round(stats[pid].revenue, 2),
-            degree=g.degree(pid),
-            strength=g.degree(pid, weight="co_orders"),
-            community=communities[pid],
+            id=sku,
+            label=products[sku].name,
+            category=products[sku].top_category,
+            orders=stats[sku].n_orders,
+            revenue=dollars(stats[sku].revenue_cents),
+            degree=g.degree(sku),
+            strength=g.degree(sku, weight="co_orders"),
+            community=communities[sku],
         )
-        for pid in sorted(g.nodes)
+        for sku in sorted(g.nodes)
     ]
     edge_out = [
         Edge(
@@ -84,46 +121,46 @@ def get_network(filters: NetworkFilters) -> Network:
         )
         for e in edges
     ]
+    refs = [
+        CommunityRef(community=cid, label=_label(g, m, names), size=len(m))
+        for cid, m in _members(communities, stats).items()
+    ]
     meta = NetworkMeta(
         start=start,
         end=end,
-        total_orders=repo.total_orders(start, end),
+        segment=filters.segment,
+        total_orders=repo.total_orders(db, start, end, filters.segment),
         node_count=len(nodes),
         edge_count=len(edge_out),
         truncated=truncated,
     )
-    return Network(meta=meta, nodes=nodes, edges=edge_out)
+    return Network(meta=meta, nodes=nodes, edges=edge_out, communities=refs)
 
 
-def get_communities(filters: NetworkFilters) -> list[Community]:
-    start, end, edges, _ = _load(filters)
+def get_communities(db: Db, filters: NetworkFilters) -> list[Community]:
+    start, end, edges, _ = _load(db, filters)
     g = build_graph(edges)
-    stats = repo.product_stats(start, end)
-    products = repo.get_products(list(g.nodes))
+    stats = repo.product_stats(db, start, end, filters.segment)
+    products = repo.get_products(db, list(g.nodes))
+    names = _names(products)
 
-    members: dict[int, list[int]] = {}
-    for pid, cid in detect_communities(g).items():
-        members.setdefault(cid, []).append(pid)
-
-    result = []
-    for cid in sorted(members):
-        by_revenue = sorted(members[cid], key=lambda p: -stats[p].revenue)
-        result.append(
-            Community(
-                community=cid,
-                size=len(by_revenue),
-                revenue=round(sum(stats[p].revenue for p in by_revenue), 2),
-                top_products=[
-                    ProductRef(id=p, name=products[p].name)
-                    for p in by_revenue[:TOP_PRODUCTS_PER_COMMUNITY]
-                ],
-            )
+    return [
+        Community(
+            community=cid,
+            label=_label(g, members, names),
+            size=len(members),
+            revenue=dollars(sum(stats[p].revenue_cents for p in members)),
+            top_products=[
+                ProductRef(id=p, name=names[p])
+                for p in members[:TOP_PRODUCTS_PER_COMMUNITY]
+            ],
         )
-    return result
+        for cid, members in _members(detect_communities(g), stats).items()
+    ]
 
 
-def get_centrality(params: CentralityParams) -> Centrality:
-    _, _, edges, _ = _load(params)
+def get_centrality(db: Db, params: CentralityParams) -> Centrality:
+    _, _, edges, _ = _load(db, params)
     g = build_graph(edges)
 
     if params.metric == "degree":
@@ -136,11 +173,11 @@ def get_centrality(params: CentralityParams) -> Centrality:
         scores = nx.betweenness_centrality(g, k=k, seed=42)
 
     top = sorted(scores.items(), key=lambda kv: (-kv[1], kv[0]))[: params.limit]
-    products = repo.get_products([pid for pid, _ in top])
+    products = repo.get_products(db, [sku for sku, _ in top])
     return Centrality(
         metric=params.metric,
         items=[
-            CentralityItem(id=pid, name=products[pid].name, score=round(score, 4))
-            for pid, score in top
+            CentralityItem(id=sku, name=products[sku].name, score=round(score, 4))
+            for sku, score in top
         ],
     )

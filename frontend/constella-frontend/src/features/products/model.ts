@@ -1,4 +1,4 @@
-import { baseNetwork, productById, products, recentChange, series, storeInfo, type Product } from "@/data/store"
+import { baseNetwork, productById, products, recentChange, series, weeklyOrders, type Product } from "@/data/store"
 
 /** One row per product: 12 weeks of sales and its pairs over 90 days. */
 export interface ProductRow {
@@ -13,7 +13,6 @@ export interface ProductRow {
 }
 
 const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0)
-const weeklyOrders = storeInfo.orders90 / 13
 
 export const rows: ProductRow[] = products.map((p) => {
   const s = series[p.id]

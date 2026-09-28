@@ -3,7 +3,7 @@ import { SearchIcon, XIcon } from "lucide-react"
 import { Dialog } from "radix-ui"
 import { SelectField } from "@/components/controls/SelectField"
 import { Button } from "@/components/ui/button"
-import { categories, productById, products, storeInfo } from "@/data/store"
+import { categories, featuredProduct, productById, products, storeInfo } from "@/data/store"
 import { useMediaQuery } from "@/hooks/useMediaQuery"
 import { detail as detailCopy, page, toolbar, table as tableCopy } from "./content"
 import { rowById, rows } from "./model"
@@ -19,7 +19,7 @@ export function ProductsPage({ params }: { params: URLSearchParams }) {
   const wide = useMediaQuery("(min-width: 1024px)")
   const fromLink = params.get("product")
   const [selected, setSelected] = useState<string | null>(() =>
-    fromLink && productById[fromLink] ? fromLink : window.matchMedia("(min-width: 1024px)").matches ? "coffee" : null,
+    fromLink && productById[fromLink] ? fromLink : window.matchMedia("(min-width: 1024px)").matches ? featuredProduct : null,
   )
   const [query, setQuery] = useState("")
   const [category, setCategory] = useState("all")

@@ -2,9 +2,10 @@ import type { Segment } from "@/components/assistant"
 import type { LiftRow } from "@/components/charts/LiftDotPlot"
 import { articulationPoints, components } from "@/components/graph"
 import { summarise, type CampaignRecord } from "@/data/campaigns"
+import { getNetwork } from "@/data/networks"
 import {
   communities,
-  getNetwork,
+  communityLabel,
   periodById,
   productById,
   products,
@@ -12,6 +13,7 @@ import {
   segmentById,
   series,
   seriesOf,
+  weeks,
   type PeriodId,
   type SegmentId,
 } from "@/data/store"
@@ -23,7 +25,7 @@ import { fmt } from "@/lib/format"
  */
 
 const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0)
-const name = (id: string) => productById[id].label
+const name = (id: string) => productById[id]?.label ?? id
 
 export function buildReport(periodId: PeriodId, segmentId: SegmentId, campaigns: CampaignRecord[]) {
   const period = periodById(periodId)
@@ -74,11 +76,28 @@ export function buildReport(periodId: PeriodId, segmentId: SegmentId, campaigns:
   const bestCampaign = [...results].sort((a, b) => b.s.returnRatio - a.s.returnRatio)[0]
   const weakest = [...results].sort((a, b) => a.s.returnRatio - b.s.returnRatio)[0]
   const growing = communityRows.reduce((a, b) => (b.change > a.change ? b : a))
-  const pastaEdge = net.edges.find((e) => (e.source === "pasta" && e.target === "parmesan") || (e.source === "parmesan" && e.target === "pasta"))
+  // The discount to run: a strong pair (lift ≥ 2.5) that the fewest of the anchor's orders include.
+  const ordersOf = (id: string) => net.nodes.find((n) => n.id === id)?.orders ?? 0
+  const discount = net.edges
+    .filter((e) => e.lift >= 2.5)
+    .map((e) => {
+      const sourceLeads = ordersOf(e.source) >= ordersOf(e.target)
+      return { e, anchor: sourceLeads ? e.source : e.target, addon: sourceLeads ? e.target : e.source, attach: sourceLeads ? e.confidenceAB : e.confidenceBA }
+    })
+    .sort((a, b) => a.attach - b.attach)[0]
+  // The stock check: the product that fell most while its strongest partner grew.
+  const stockCheck = falling
+    .map((f) => {
+      const partner = [...net.edges].filter((e) => e.source === f.p.id || e.target === f.p.id).sort((a, b) => b.lift - a.lift)[0]
+      const other = partner ? (partner.source === f.p.id ? partner.target : partner.source) : null
+      return { ...f, partner: other, partnerChange: other && series[other] ? recentChange(series[other].revenue) : 0 }
+    })
+    .find((f) => f.change < 0)
+  const last4Range = `${weeks[weeks.length - 4].label} – ${weeks[weeks.length - 1].label}`
 
   const summary: Segment[] = [
-    "Revenue from these 30 products was ",
-    { value: fmt.money(revenue), source: "Revenue, last 4 weeks (Aug 30 – Sep 26)" },
+    `Revenue from these ${products.length} products was `,
+    { value: fmt.money(revenue), source: `Revenue, last 4 weeks (weeks of ${last4Range})` },
     ` over the last 4 weeks, ${revenue >= revenueBefore ? "up" : "down"} `,
     { value: fmt.change(revenue / revenueBefore - 1), source: "Revenue, last 4 weeks vs the 4 before" },
     ` on the 4 weeks before. ${growing.label} grew fastest. The strongest pair is ${name(byLift[0].source)} and ${name(byLift[0].target)}, at `,
@@ -87,29 +106,35 @@ export function buildReport(periodId: PeriodId, segmentId: SegmentId, campaigns:
   ]
 
   const recommendations: { title: string; body: Segment[]; prompt?: string }[] = [
-    ...(pastaEdge
+    ...(discount
       ? [
           {
-            title: "Run a Pasta night discount on Parmesan",
+            title: `Run a ${communityLabel(productById[discount.anchor]?.community)} discount on ${name(discount.addon)}`,
             body: [
-              "Parmesan is Spaghetti's strong pair (",
-              { value: fmt.lift(pastaEdge.lift), source: `Lift, ${where}` },
+              `${name(discount.addon)} is ${name(discount.anchor)}'s strong pair (`,
+              { value: fmt.lift(discount.e.lift), source: `Lift, ${where}` },
               ") but only ",
-              { value: fmt.pct(pastaEdge.source === "pasta" ? pastaEdge.confidenceAB : pastaEdge.confidenceBA), source: `Share of Spaghetti orders with Parmesan, ${where}` },
-              " of Spaghetti orders include it. Discount the add-on and keep Spaghetti at full price.",
+              { value: fmt.pct(discount.attach), source: `Share of ${name(discount.anchor)} orders with ${name(discount.addon)}, ${where}` },
+              ` of ${name(discount.anchor)} orders include it. Discount the add-on and keep ${name(discount.anchor)} at full price.`,
             ] as Segment[],
-            prompt: "Design a discount campaign for Pasta night",
+            prompt: `Design a discount for ${name(discount.addon)} with ${name(discount.anchor)}`,
           },
         ]
       : []),
-    {
-      title: "Check Coffee Filters stock",
-      body: [
-        "Coffee Filters fell ",
-        { value: fmt.change(recentChange(series.filters.revenue)), source: "Coffee Filters revenue, last 4 weeks vs the 4 before" },
-        " while Ground Coffee grew, and the Morning coffee bundle's orders dropped in its last week. That points to supply, not demand.",
-      ],
-    },
+    ...(stockCheck
+      ? [
+          {
+            title: `Check ${stockCheck.p.label} stock`,
+            body: [
+              `${stockCheck.p.label} fell `,
+              { value: fmt.change(stockCheck.change), source: `${stockCheck.p.label} revenue, last 4 weeks vs the 4 before` },
+              stockCheck.partner && stockCheck.partnerChange > 0
+                ? ` while ${name(stockCheck.partner)}, its strongest pair, grew. That points to supply, not demand.`
+                : ". Check stock and shelf placement before changing its price.",
+            ] as Segment[],
+          },
+        ]
+      : []),
     ...(bridges[0]
       ? [
           {

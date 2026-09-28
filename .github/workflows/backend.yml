@@ -13,6 +13,20 @@ jobs:
     name: ruff, pytest
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # The API tests build their own copy of the warehouse's serving contract in this throwaway
+    # Postgres (tests/warehouse_fixture.py); they don't need the data platform.
+    services:
+      postgres:
+        image: postgres:17
+        # Trust auth: the container is thrown away after the job, so it needs no credentials.
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 2s --health-timeout 3s --health-retries 30
+    env:
+      TEST_POSTGRES_URL: postgresql://postgres@localhost:5432/postgres
     defaults:
       run:
         working-directory: backend

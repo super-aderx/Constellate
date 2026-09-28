@@ -1,3 +1,6 @@
+import { LAST_DATA_DAY } from "@/data/store"
+import { shortDate } from "@/lib/dates"
+
 /** Business report copy. The report's findings are written by `report.ts` from the data. */
 
 export const report = {
@@ -5,7 +8,7 @@ export const report = {
   kind: "Generated report",
   title: (store: string) => `Business report for ${store}`,
   scope: (range: string, segment: string) =>
-    `Pairs, communities and bridges: ${range}, ${segment.toLowerCase()}. Sales trends: the 12 weeks to Sep 26, all customers.`,
+    `Pairs, communities and bridges: ${range}, ${segment.toLowerCase()}. Sales trends: the 12 weeks to ${shortDate(LAST_DATA_DAY)}, all customers.`,
   generated: (asOf: string) => `Data as of ${asOf}`,
   back: "Back to Constella AI",
   print: "Print or save as PDF",

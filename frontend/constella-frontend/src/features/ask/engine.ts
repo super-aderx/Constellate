@@ -2,11 +2,13 @@ import type { Segment, TraceStep } from "@/components/assistant"
 import type { LiftRow } from "@/components/charts/LiftDotPlot"
 import type { RankItem } from "@/components/charts/RankList"
 import { articulationPoints, components } from "@/components/graph"
+import { getNetwork, segmentAffinity } from "@/data/networks"
 import {
   communities,
   communityLabel,
   communitySeries,
-  getNetwork,
+  featuredProduct,
+  LAST_DATA_DAY,
   periodById,
   productById,
   products,
@@ -26,7 +28,7 @@ import { fmt } from "@/lib/format"
  * A scripted stand-in for Constella AI until the agent exists. It recognises what a question is
  * after (pairs, bridges, communities, trends, campaigns, slogans, a report), finds the products and
  * communities it names, and writes the answer from the same mock data the other pages show, so
- * every figure is real for that data. Anything it can't place gets an honest "here's what I can do".
+ * every figure is real: it comes from the warehouse. Anything it can't place gets an honest "here's what I can do".
  */
 
 export interface CampaignDraft {
@@ -65,66 +67,47 @@ export interface Scope {
 
 /* ---------- Recognising products and communities ---------- */
 
-const ALIASES: [string, string][] = [
-  ["whole milk", "milk"],
-  ["oat milk", "oat"],
-  ["ground coffee", "coffee"],
-  ["coffee filter", "filters"],
-  ["filters", "filters"],
-  ["greek yogurt", "yogurt"],
-  ["yogurt", "yogurt"],
-  ["yoghurt", "yogurt"],
-  ["eggs", "eggs"],
-  ["egg", "eggs"],
-  ["butter", "butter"],
-  ["sourdough", "bread"],
-  ["bread", "bread"],
-  ["jam", "jam"],
-  ["banana", "bananas"],
-  ["granola", "granola"],
-  ["biscotti", "biscotti"],
-  ["spaghetti", "pasta"],
-  ["tomato sauce", "sauce"],
-  ["sauce", "sauce"],
-  ["parmesan", "parmesan"],
-  ["basil", "basil"],
-  ["garlic", "garlic"],
-  ["olive oil", "oil"],
-  ["red wine", "wine"],
-  ["wine", "wine"],
-  ["tortilla chips", "chips"],
-  ["chips", "chips"],
-  ["salsa", "salsa"],
-  ["guacamole", "guac"],
-  ["guac", "guac"],
-  ["lager", "lager"],
-  ["beer", "lager"],
-  ["sour cream", "sourcream"],
-  ["lime", "limes"],
-  ["turkey", "turkey"],
-  ["cheddar", "cheddar"],
-  ["apple", "apples"],
-  ["juice", "juice"],
-  ["paper towel", "towels"],
-  ["towels", "towels"],
-  ["milk", "milk"],
-  ["coffee", "coffee"],
-]
+/** Product names without pack sizes: "Eggs (12)" → "Eggs". */
+const shortName = (label: string) => label.replace(/\s*\(.*?\)/g, "")
 
-const COMMUNITY_WORDS: [RegExp, number][] = [
-  [/breakfast/, 0],
-  [/coffee (community|group|shoppers)|morning coffee/, 1],
-  [/pasta night|pasta/, 2],
-  [/game ?day|snacks/, 3],
-  [/lunch ?box|lunch/, 4],
-]
+/** Words that describe rather than name a product, so they never identify one on their own. */
+const DESCRIPTIVE = new Set(["whole", "ground", "fresh", "sliced", "greek", "red", "white", "green", "paper", "strawberry", "almond", "tortilla", "tomato", "unsalted", "cane", "all-purpose", "sparkling", "creamy"])
+/** Other words shoppers use for a product's own words. */
+const SYNONYMS: Record<string, string> = { beer: "lager", yoghurt: "yogurt", guac: "guacamole", pasta: "spaghetti" }
+
+/**
+ * Phrases that name a product: its full name, and each distinctive word in it (singular and
+ * plural). A word shared by several products ("milk") names the one bought most often.
+ */
+const ALIASES: [string, string][] = (() => {
+  const full = new Map<string, string>()
+  const words = new Map<string, string[]>()
+  for (const p of products) {
+    const n = shortName(p.label).toLowerCase()
+    full.set(n, p.id)
+    for (const w of n.split(/\s+/)) {
+      if (w.length < 3 || DESCRIPTIVE.has(w)) continue
+      for (const form of new Set([w, w.replace(/s$/, ""), w.endsWith("s") ? w : `${w}s`])) {
+        if (form.length >= 3) words.set(form, [...(words.get(form) ?? []), p.id])
+      }
+    }
+  }
+  const popular = (ids: string[]) => [...new Set(ids)].sort((a, b) => productById[b].weekly - productById[a].weekly)[0]
+  const aliases = new Map<string, string>([...words].map(([w, ids]) => [w, popular(ids)]))
+  for (const [n, id] of full) aliases.set(n, id)
+  for (const [alias, word] of Object.entries(SYNONYMS)) {
+    const id = aliases.get(word)
+    if (id && !aliases.has(alias)) aliases.set(alias, id)
+  }
+  return [...aliases]
+})()
 
 function findProducts(text: string): string[] {
   let rest = text
   const found: string[] = []
   // Longest phrases first, and each match is blanked so "oat milk" isn't also read as "milk".
   for (const [phrase, id] of [...ALIASES].sort((a, b) => b[0].length - a[0].length)) {
-    const at = rest.indexOf(phrase)
+    const at = rest.search(new RegExp(`\\b${phrase.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`))
     if (at >= 0) {
       if (!found.includes(id)) found.push(id)
       rest = rest.slice(0, at) + " ".repeat(phrase.length) + rest.slice(at + phrase.length)
@@ -136,14 +119,20 @@ function findProducts(text: string): string[] {
 const indexOfProduct = (text: string, id: string) =>
   Math.min(...ALIASES.filter(([, x]) => x === id).map(([p]) => (text.indexOf(p) < 0 ? 1e9 : text.indexOf(p))))
 
-function findCommunity(text: string): number | null {
-  for (const [re, c] of COMMUNITY_WORDS) if (re.test(text)) return c
-  return null
+/** A community named in the question by its label; the label is blanked so its product names
+ * don't also count as products. */
+function findCommunity(text: string): { community: number | null; rest: string } {
+  for (const c of [...communities].sort((a, b) => b.label.length - a.label.length)) {
+    const label = c.label.toLowerCase()
+    const at = text.indexOf(label)
+    if (at >= 0) return { community: c.community, rest: text.slice(0, at) + " ".repeat(label.length) + text.slice(at + label.length) }
+  }
+  return { community: null, rest: text }
 }
 
 /* ---------- Helpers ---------- */
 
-const name = (id: string) => productById[id].label
+const name = (id: string) => productById[id]?.label ?? id
 const list = (xs: string[]) => (xs.length <= 1 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`)
 const other = (e: NetEdge, id: string) => (e.source === id ? e.target : e.source)
 const attachOf = (e: NetEdge, from: string) => (e.source === from ? e.confidenceAB : e.confidenceBA)
@@ -152,50 +141,27 @@ const pairsOf = (net: Network, id: string) =>
 const find = (net: Network, a: string, b: string) =>
   net.edges.find((e) => (e.source === a && e.target === b) || (e.source === b && e.target === a))
 
-const SLOGANS: Record<string, string[][]> = {
-  "0": [
-    ["Saturday starts with sourdough.", "Good mornings, sorted.", "Breakfast for the whole table."],
-    ["Rise, toast, repeat.", "Everything for breakfast, one aisle.", "Make the morning slower."],
-  ],
-  "1": [
-    ["Brew it right from the first scoop.", "Coffee's best pair, in one bundle.", "Every cup, covered."],
-    ["Your morning, ground and ready.", "Filter, brew, enjoy.", "The coffee run, done in one."],
-  ],
-  "2": [
-    ["Pasta night, sorted.", "A grate finish, now on offer.", "Dinner's in the bag."],
-    ["Twirl, grate, repeat.", "Tuesday tastes like Italy.", "Everything but the pot."],
-  ],
-  "3": [
-    ["Kickoff tastes better with salsa.", "Chips, meet your match.", "Snacks for the whole squad."],
-    ["Halftime, handled.", "Dip into game day.", "The crowd-pleaser kit."],
-  ],
-  "4": [
-    ["Lunch, packed.", "Two boxes, zero morning rush.", "Lunchbox heroes start here."],
-    ["Pack it, snack it.", "School-day lunches, sorted.", "The lunchbox that trades well."],
-  ],
-  none: [
-    ["Stock up and save.", "The pair people already buy.", "Two favourites, one price."],
-    ["Better together, now for less.", "Your basket, finished.", "Grab both and go."],
-  ],
+/** Slogan sets for an offer: the add-on sold as the anchor's natural partner. */
+function slogans(anchor: string, addon: string): string[][] {
+  const a = shortName(name(anchor))
+  const b = shortName(name(addon))
+  return [
+    [`${b}, better with ${a}.`, "The pair people already buy.", "Two favourites, one price."],
+    [`Your ${a} run, finished.`, "Better together, now for less.", `Grab the ${b} and go.`],
+  ]
 }
 
-const CAMPAIGN_NAMES: Record<string, string> = {
-  "0": "Weekend breakfast",
-  "1": "Morning coffee bundle",
-  "2": "Pasta night kit",
-  "3": "Game day kit",
-  "4": "Lunchbox restock",
-}
+const campaignName = (community: number) => `${communityLabel(community)} bundle`
 
 const call = {
   network: (s: Scope) => {
-    const range: Record<PeriodId, string> = { "30d": "start=2026-08-28", "90d": "start=2026-06-29", "12m": "start=2025-09-27" }
-    return `GET /network?${range[s.period]}&end=2026-09-26&segment=${s.segment}&min_co_orders=5`
+    const p = periodById(s.period)
+    return `GET /network?start=${p.start}&end=${p.end}&segment=${s.segment}&min_co_orders=5`
   },
   neighbors: (id: string, s: Scope) => `GET /products/${id}/neighbors?segment=${s.segment}&sort=lift`,
-  communities: (s: Scope) => `GET /communities?segment=${s.segment}`,
-  bridges: (s: Scope) => `GET /network/articulation-points?segment=${s.segment}`,
-  sales: "GET /products/sales?weeks=12&end=2026-09-26",
+  communities: (s: Scope) => `GET /network/communities?segment=${s.segment}`,
+  bridges: (s: Scope) => `${call.network(s)} (articulation points of the pairs)`,
+  sales: `GET /sales/weekly?weeks=12&end=${LAST_DATA_DAY}`,
 }
 
 /* ---------- Answers ---------- */
@@ -206,8 +172,8 @@ export function answer(question: string, scope: Scope): Answer {
   const period = periodById(scope.period)
   const segment = segmentById(scope.segment)
   const where = `${period.range}, ${segment.label.toLowerCase()}`
-  const ids = findProducts(text)
-  const community = findCommunity(text)
+  const { community, rest } = findCommunity(text)
+  const ids = findProducts(rest)
   const baseTrace: TraceStep = { label: `Pairs for ${where}`, call: call.network(scope), result: `${net.edges.length} pairs, ${net.nodes.length} products` }
   const src = {
     pair: (a: string, b: string) => `Orders with ${name(a)} and ${name(b)}, ${where}`,
@@ -357,9 +323,7 @@ export function answer(question: string, scope: Scope): Answer {
         { value: fmt.change(worst[0].change), source: src.sales(worst[0].p.id) },
         ".",
       ],
-      points: worst[0].p.id === "filters"
-        ? [["Coffee Filters fell while Ground Coffee grew, which usually means a stock problem, not demand. The Morning coffee bundle's orders dropped the same week."]]
-        : [[`Check stock and shelf placement for ${worst[0].p.label} before changing its price.`]],
+      points: [[`Check stock and shelf placement for ${worst[0].p.label} before changing its price.`]],
       evidence: { kind: "rank", label: "Biggest falls, last 4 weeks vs the 4 before", format: "down", items: worst.map((w) => ({ id: w.p.id, name: w.p.label, community: w.p.community, score: Math.abs(w.change) })) },
       trace: [{ label: "Sales by product", call: call.sales, result: `${products.length} products, weeks of ${weeks[0].label} – ${weeks[weeks.length - 1].label}` }],
       followUps: [`What sells with ${worst[0].p.label}?`, "Which products are growing?"],
@@ -384,10 +348,11 @@ export function answer(question: string, scope: Scope): Answer {
   }
 
   if (/customer|champion|loyal|segment|rfm|at risk|hibernat|new shoppers/.test(text)) {
-    const seg = segments.find((s) => text.includes(s.label.toLowerCase()) || (s.id === "atRisk" && text.includes("at risk"))) ?? segments[1]
+    const seg = segments.find((s) => s.id !== "all" && text.includes(s.label.toLowerCase())) ?? segments[1]
     const segNet = getNetwork(scope.period, seg.id)
     const top = [...segNet.edges].sort((a, b) => b.lift - a.lift)[0]
-    const favourite = communities.map((c) => ({ ...c, a: seg.affinity[c.community] })).sort((a, b) => b.a - a.a)[0]
+    const affinity = segmentAffinity(scope.period, seg.id)
+    const favourite = communities.map((c) => ({ ...c, a: affinity[c.community] ?? 1 })).sort((a, b) => b.a - a.a)[0]
     return {
       reading: `Reading orders from ${seg.label.toLowerCase()}`,
       headline: [
@@ -458,7 +423,11 @@ export function answer(question: string, scope: Scope): Answer {
     headline: ["I can answer questions about your products, the pairs they're bought in, communities, sales trends and customer segments, and draft campaigns and slogans. Try naming a product or a goal."],
     points: [],
     trace: [],
-    followUps: ["What sells with Whole Milk?", "Which products hold baskets together?", "Design a discount campaign for Pasta night"],
+    followUps: [
+      `What sells with ${name(featuredProduct)}?`,
+      "Which products hold baskets together?",
+      ...(communities[0] ? [`Design a discount campaign for ${communities[0].label}`] : []),
+    ],
   }
 }
 
@@ -478,8 +447,9 @@ function draftCampaign(
     anchor = ids[0]
     addon = ids[1]
   } else {
-    // With no product named, a community's hub (most pairs inside it) anchors the offer; Pasta night by default.
-    const inCommunity = community ?? (ids.length ? null : 2)
+    // With no product named, a community's hub (most pairs inside it) anchors the offer; the
+    // biggest community by default.
+    const inCommunity = community ?? (ids.length ? null : (communities[0]?.community ?? null))
     const degreeInside = (id: string) =>
       pairsOf(net, id).filter((e) => inCommunity == null || productById[other(e, id)].community === inCommunity).length
     const pool = ids.length
@@ -488,7 +458,7 @@ function draftCampaign(
           .filter((p) => p.community === inCommunity)
           .sort((a, b) => degreeInside(b.id) - degreeInside(a.id) || b.weekly * b.price - a.weekly * a.price)
           .map((p) => p.id)
-    anchor = pool.find((id) => pairsOf(net, id).length > 0) ?? "pasta"
+    anchor = pool.find((id) => pairsOf(net, id).length > 0) ?? featuredProduct
     const partners = pairsOf(net, anchor).filter((e) => inCommunity == null || productById[other(e, anchor)].community === inCommunity)
     // The add-on: a strong pair that few of the anchor's orders include yet. Strongest tier first.
     const tier = [3, 2, 0].map((min) => partners.filter((e) => e.lift >= min)).find((t) => t.length) ?? pairsOf(net, anchor)
@@ -496,10 +466,9 @@ function draftCampaign(
     addon = pick ? other(pick, anchor) : anchor
   }
   const edge = find(net, anchor, addon)
-  const comm = community ?? productById[anchor].community
-  const key = comm == null ? "none" : String(comm)
-  const pct = productById[addon].price > 5 ? 15 : 20
-  const campaignName = (community != null || ids.length === 0) && comm != null ? CAMPAIGN_NAMES[key] : `${name(anchor)} and ${name(addon)} bundle`
+  const comm = community ?? productById[anchor]?.community ?? null
+  const pct = (productById[addon]?.price ?? 0) > 5 ? 15 : 20
+  const draftName = (community != null || ids.length === 0) && comm != null ? campaignName(comm) : `${shortName(name(anchor))} and ${shortName(name(addon))} bundle`
   const offer = `${pct}% off ${name(addon)} with ${name(anchor)}`
   const liftSeg: Segment[] = edge ? [{ value: fmt.lift(edge.lift), source: src.lift(anchor, addon) }] : ["more"]
   const why = edge
@@ -507,7 +476,7 @@ function draftCampaign(
     : `${name(anchor)} and ${name(addon)} share customers in the same community.`
 
   return {
-    name: campaignName,
+    name: draftName,
     products: [anchor, addon],
     community: comm,
     liftSeg,
@@ -533,11 +502,11 @@ function draftCampaign(
         } satisfies Evidence)
       : undefined,
     campaign: {
-      name: campaignName,
+      name: draftName,
       offer,
       products: [anchor, addon],
       community: comm,
-      sloganSets: SLOGANS[key],
+      sloganSets: slogans(anchor, addon),
       why,
     } satisfies CampaignDraft,
   }

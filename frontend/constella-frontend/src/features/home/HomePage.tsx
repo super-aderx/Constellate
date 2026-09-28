@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { storeInfo } from "@/data/store"
 import { account } from "@/features/app/content"
 import { AiOverview } from "./AiOverview"
 import { header } from "./content"
@@ -16,7 +17,7 @@ export function HomePage() {
         <h1 className="text-[clamp(1.75rem,1.4rem+1.4vw,2.5rem)] leading-[1.1] font-bold tracking-[-0.035em]">
           {header.greeting(hour, account.firstName)}
         </h1>
-        <p className="mt-2 max-w-[60ch] text-[15px] leading-6 text-ink-muted md:text-base">{header.summary(account.store)}</p>
+        <p className="mt-2 max-w-[60ch] text-[15px] leading-6 text-ink-muted md:text-base">{header.summary(storeInfo.name)}</p>
       </header>
 
       <SalesSky />

@@ -8,7 +8,8 @@ import {
   touches,
   type UnitPositions,
 } from "@/components/graph"
-import { baseNetwork, getNetwork, type NetEdge, type NetNode, type Network, type PeriodId, type SegmentId } from "@/data/store"
+import { getNetwork } from "@/data/networks"
+import { baseNetwork, type NetEdge, type NetNode, type Network, type PeriodId, type SegmentId } from "@/data/store"
 import type { Scope } from "./content"
 
 /** What the canvas draws for the current filters, plus the analysis the cards and insights read. */

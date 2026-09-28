@@ -1,9 +1,13 @@
 import { useSyncExternalStore } from "react"
-import { productById } from "./store"
+import { addDays, dateRange, daysBetween, shortDate, toDate } from "@/lib/dates"
+import { fmt } from "@/lib/format"
+import { baseNetwork, LAST_DATA_DAY, productById } from "./store"
 
 /**
  * Mock campaigns, kept in memory so a draft saved in Constella AI shows up on the Campaigns page.
- * Resets on reload. "Today" is Sun Sep 27, 2026, the day after the data's last full day.
+ * Resets on reload. The warehouse has no promotions yet (P1), so campaigns and their results stay
+ * simulated; their products, prices and pair figures come from the real store data, and their
+ * dates sit around "today", the day after the data's last complete day.
  */
 
 export type CampaignStatus = "draft" | "scheduled" | "active" | "paused" | "ended"
@@ -30,7 +34,7 @@ export interface CampaignRecord {
   id: string
   name: string
   offer: string
-  /** Product ids; the first is the anchor, the rest are what the offer adds. */
+  /** Product ids (SKUs); the first is the anchor, the rest are what the offer adds. */
   products: string[]
   community: number | null
   slogans: string[]
@@ -45,30 +49,8 @@ export interface CampaignRecord {
   results?: CampaignResults
 }
 
-export const TODAY = "2026-09-27"
-export const LAST_DATA_DAY = "2026-09-26"
-
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-
-const toDate = (iso: string) => new Date(`${iso}T00:00:00Z`)
-const addDays = (iso: string, n: number) => {
-  const d = toDate(iso)
-  d.setUTCDate(d.getUTCDate() + n)
-  return d.toISOString().slice(0, 10)
-}
-export const daysBetween = (a: string, b: string) => Math.round((toDate(b).getTime() - toDate(a).getTime()) / 86_400_000)
-
-/** "Sep 7" */
-export function shortDate(iso: string) {
-  const d = toDate(iso)
-  return `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}`
-}
-
-/** "Sep 7 – Oct 4" */
-export function dateRange(start?: string, end?: string) {
-  if (!start) return ""
-  return end ? `${shortDate(start)} – ${shortDate(end)}` : `From ${shortDate(start)}`
-}
+export { LAST_DATA_DAY }
+export const TODAY = addDays(LAST_DATA_DAY, 1)
 
 /** Small seeded wobble so daily lines look like real days. */
 function wobble(seed: number, i: number) {
@@ -145,28 +127,39 @@ export function summarise(r: CampaignResults) {
 }
 
 const price = (id: string) => productById[id]?.price ?? 0
+const day = (n: number) => addDays(TODAY, n)
+const name = (id: string) => productById[id]?.label ?? id
 
-const seed: CampaignRecord[] = [
+/** "Coffee Filters joins Ground Coffee in 340 orders over 90 days, 5.10× as often as chance." */
+function pairWhy(anchor: string, addon: string) {
+  const e = baseNetwork().edges.find((x) => (x.source === anchor && x.target === addon) || (x.source === addon && x.target === anchor))
+  return e
+    ? `${name(addon)} joins ${name(anchor)} in ${fmt.int(e.coOrders)} orders over 90 days, ${fmt.lift(e.lift)} as often as chance.`
+    : `${name(addon)} and ${name(anchor)} share customers.`
+}
+
+type Seed = Omit<CampaignRecord, "community">
+
+const seeds: Seed[] = [
   {
     id: "c-coffee",
     name: "Morning coffee bundle",
     offer: "$1.50 off Coffee Filters with Ground Coffee",
-    products: ["coffee", "filters"],
-    community: 1,
+    products: ["HS-COFFEE", "HS-FILTERS"],
     slogans: ["Brew it right from the first scoop.", "Coffee's best pair, in one bundle."],
     status: "active",
-    start: "2026-09-07",
-    end: "2026-10-04",
+    start: day(-20),
+    end: day(7),
     source: "ai",
-    why: "Coffee Filters is Ground Coffee's strongest pair: 5.10× as often as chance, in 340 orders over 90 days.",
+    why: pairWhy("HS-COFFEE", "HS-FILTERS"),
     results: simulate({
       seed: 1,
-      start: "2026-09-07",
+      start: day(-20),
       through: LAST_DATA_DAY,
       baseline: 3.7,
       uplift: 0.34,
       slump: [7, 0.58],
-      basketValue: price("coffee") + price("filters"),
+      basketValue: price("HS-COFFEE") + price("HS-FILTERS"),
       discountPerOrder: 1.5,
       attachBefore: 0.105,
     }),
@@ -175,20 +168,19 @@ const seed: CampaignRecord[] = [
     id: "c-lunch",
     name: "Back-to-school lunchbox",
     offer: "Juice Boxes 2 for $8 with Sliced Turkey",
-    products: ["turkey", "juice"],
-    community: 4,
+    products: ["HS-TURKEY", "HS-JUICE"],
     slogans: ["Lunch, packed.", "Two boxes, zero morning rush."],
     status: "active",
-    start: "2026-08-24",
-    end: "2026-10-04",
+    start: day(-34),
+    end: day(7),
     source: "you",
     results: simulate({
       seed: 2,
-      start: "2026-08-24",
+      start: day(-34),
       through: LAST_DATA_DAY,
       baseline: 1.5,
       uplift: 0.62,
-      basketValue: price("turkey") + price("juice") * 2,
+      basketValue: price("HS-TURKEY") + price("HS-JUICE") * 2,
       discountPerOrder: 0.98,
       attachBefore: 0.077,
     }),
@@ -197,21 +189,20 @@ const seed: CampaignRecord[] = [
     id: "c-gameday",
     name: "Game day kit",
     offer: "15% off Salsa with Tortilla Chips",
-    products: ["chips", "salsa"],
-    community: 3,
+    products: ["HS-CHIPS", "HS-SALSA"],
     slogans: ["Kickoff tastes better with salsa.", "Chips, meet your match."],
     status: "ended",
-    start: "2026-08-01",
-    end: "2026-08-31",
+    start: day(-57),
+    end: day(-27),
     source: "ai",
-    why: "Tortilla Chips and Salsa are bought together 5.80× as often as chance.",
+    why: pairWhy("HS-CHIPS", "HS-SALSA"),
     results: simulate({
       seed: 3,
-      start: "2026-08-01",
-      through: "2026-08-31",
+      start: day(-57),
+      through: day(-27),
       baseline: 6.4,
       uplift: 0.48,
-      basketValue: price("chips") + price("salsa"),
+      basketValue: price("HS-CHIPS") + price("HS-SALSA"),
       discountPerOrder: 0.57,
       attachBefore: 0.19,
     }),
@@ -220,20 +211,19 @@ const seed: CampaignRecord[] = [
     id: "c-pasta-oil",
     name: "Summer pasta",
     offer: "20% off Olive Oil with Spaghetti",
-    products: ["pasta", "oil"],
-    community: 2,
+    products: ["HS-PASTA", "HS-OIL"],
     slogans: ["A drizzle of summer."],
     status: "ended",
-    start: "2026-07-06",
-    end: "2026-07-26",
+    start: day(-83),
+    end: day(-63),
     source: "you",
     results: simulate({
       seed: 4,
-      start: "2026-07-06",
-      through: "2026-07-26",
+      start: day(-83),
+      through: day(-63),
       baseline: 1.6,
       uplift: 0.14,
-      basketValue: price("pasta") + price("oil"),
+      basketValue: price("HS-PASTA") + price("HS-OIL"),
       discountPerOrder: 2.2,
       attachBefore: 0.087,
     }),
@@ -242,26 +232,29 @@ const seed: CampaignRecord[] = [
     id: "c-breakfast",
     name: "Weekend breakfast",
     offer: "Free Strawberry Jam with two Sourdough loaves",
-    products: ["bread", "jam"],
-    community: 0,
+    products: ["HS-BREAD", "HS-JAM"],
     slogans: ["Saturday starts with sourdough.", "Toast, but better."],
     status: "scheduled",
-    start: "2026-10-03",
-    end: "2026-10-25",
+    start: day(6),
+    end: day(28),
     source: "you",
   },
   {
     id: "c-oat",
     name: "Oat milk latte kit",
     offer: "10% off Oat Milk with Ground Coffee",
-    products: ["coffee", "oat"],
-    community: 1,
+    products: ["HS-COFFEE", "HS-OAT"],
     slogans: ["Your latte, your way.", "Oat milk, brewed for it."],
     status: "draft",
     source: "ai",
-    why: "Oat Milk joins Ground Coffee in 300 orders, 2.80× as often as chance, and Oat Milk sales are up.",
+    why: pairWhy("HS-COFFEE", "HS-OAT"),
   },
 ]
+
+/** The sample campaigns are written for Harbor Street; another store starts with the ones whose products it sells. */
+const seed: CampaignRecord[] = seeds
+  .filter((c) => c.products.every((id) => productById[id]))
+  .map((c) => ({ ...c, community: productById[c.products[0]].community }))
 
 /* ---------- The in-memory store ---------- */
 
@@ -300,4 +293,4 @@ export function removeCampaign(id: string) {
   emit(state.filter((c) => c.id !== id))
 }
 
-export { addDays }
+export { addDays, dateRange, daysBetween, shortDate }
