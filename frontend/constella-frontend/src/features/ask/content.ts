@@ -1,4 +1,10 @@
+import { communities, featuredProduct, productById } from "@/data/store"
+
 /** Constella AI page copy. Answers themselves are written by `engine.ts` from the data. */
+
+// Suggested questions name the store's own best seller and communities.
+const top = productById[featuredProduct]?.label ?? "your best seller"
+const community = (i: number) => communities[Math.min(i, communities.length - 1)]?.label ?? "your biggest community"
 
 export const page = {
   title: "Constella AI",
@@ -13,15 +19,15 @@ export const presets = {
   groups: [
     {
       title: "Understand the store",
-      questions: ["What sells with Ground Coffee?", "Which products hold baskets together?", "Which products are falling?"],
+      questions: [`What sells with ${top}?`, "Which products hold baskets together?", "Which products are falling?"],
     },
     {
       title: "Plan a campaign",
-      questions: ["Design a discount campaign for Pasta night", "Suggest a bundle for Game day", "Which pair should I discount?"],
+      questions: [`Design a discount campaign for ${community(0)}`, `Suggest a bundle for ${community(1)}`, "Which pair should I discount?"],
     },
     {
       title: "Write slogans",
-      questions: ["Write slogans for a coffee bundle", "Write slogans for Lunchbox", "Write slogans for Breakfast"],
+      questions: [`Write slogans for a ${top.replace(/\s*\(.*?\)/g, "")} bundle`, `Write slogans for ${community(2)}`, `Write slogans for ${community(3)}`],
     },
   ],
 }

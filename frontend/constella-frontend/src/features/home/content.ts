@@ -1,42 +1,38 @@
 import type { TrendDay } from "@/components/charts/WeekTrend"
+import { baseNetwork, communityLabel, productById, storeInfo, week } from "@/data/store"
+import { weekdayLong } from "@/lib/dates"
 import { fmt } from "@/lib/format"
+import { appHref } from "@/lib/route"
 
 /**
- * Home page copy and mock data: one grocery store's last 7 complete days (Sun Sep 20 – Sat Sep 26, 2026)
- * against the 7 before. Figures in the AI overview are written out, so they must match the numbers here.
+ * Home page copy and data: the store's last 7 complete days against the 7 before, from the
+ * warehouse. The AI overview (simulated Constella AI) is written from the same figures, so every
+ * number in it is real.
  */
 
 export const period = {
-  current: "Sep 20 – 26",
-  previous: "Sep 13 – 19",
-  asOf: "Sep 27, 06:00",
+  current: week.current.range,
+  previous: week.previous.range,
+  asOf: storeInfo.asOf,
 }
 
 export const header = {
   greeting: (hour: number, name: string) =>
     `${hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening"}, ${name}`,
-  summary: (store: string) => `Here's how ${store} did from Sep 20 to 26, compared with the 7 days before.`,
+  summary: (store: string) => `Here's how ${store} did from ${period.current.replace(" – ", " to ")}, compared with the 7 days before.`,
 }
 
 /* ---------- The week ---------- */
 
-export const days: TrendDay[] = [
-  { id: "2026-09-20", short: "Sun 20", long: "Sunday, September 20" },
-  { id: "2026-09-21", short: "Mon 21", long: "Monday, September 21" },
-  { id: "2026-09-22", short: "Tue 22", long: "Tuesday, September 22" },
-  { id: "2026-09-23", short: "Wed 23", long: "Wednesday, September 23" },
-  { id: "2026-09-24", short: "Thu 24", long: "Thursday, September 24" },
-  { id: "2026-09-25", short: "Fri 25", long: "Friday, September 25" },
-  { id: "2026-09-26", short: "Sat 26", long: "Saturday, September 26" },
-]
+export const days: TrendDay[] = week.days
 
 /** The same weekday one week earlier, for the readout. */
-export const previousDays = ["Sun 13", "Mon 14", "Tue 15", "Wed 16", "Thu 17", "Fri 18", "Sat 19"]
+export const previousDays = week.previousDays
 
-const revenue = { current: [7480, 6120, 5890, 6340, 6710, 7390, 8280], previous: [7210, 5980, 5760, 6050, 6420, 6930, 7910] }
-const orders = { current: [296, 242, 231, 250, 263, 288, 332], previous: [290, 240, 229, 248, 262, 285, 316] }
+const revenue = week.revenue
+const orders = week.orders
 const sum = (vs: number[]) => vs.reduce((a, b) => a + b, 0)
-const ratio = (a: number[], b: number[]) => a.map((v, i) => v / b[i])
+const ratio = (a: number[], b: number[]) => a.map((v, i) => (b[i] ? v / b[i] : 0))
 
 export type MetricId = "revenue" | "orders" | "basket"
 
@@ -77,8 +73,8 @@ export const metrics: Metric[] = [
     label: "Average basket",
     current: ratio(revenue.current, orders.current),
     previous: ratio(revenue.previous, orders.previous),
-    total: sum(revenue.current) / sum(orders.current),
-    previousTotal: sum(revenue.previous) / sum(orders.previous),
+    total: sum(revenue.current) / (sum(orders.current) || 1),
+    previousTotal: sum(revenue.previous) / (sum(orders.previous) || 1),
     format: fmt.price,
     formatTick: fmt.price,
   },
@@ -103,66 +99,142 @@ export type Segment = string | { value: string; source: string }
 
 export type Signal = "rising" | "falling" | "opportunity"
 
+const name = (id: string) => productById[id]?.label ?? id
+const pairKey = (a: string, b: string) => (a < b ? `${a}|${b}` : `${b}|${a}`)
+const together = (w: "current" | "previous", a: string, b: string) => week.pairs[w].get(pairKey(a, b)) ?? 0
+const soldIn = (w: "current" | "previous", id: string) => week.sales[w].get(id)?.orders ?? 0
+const inWeek = (w: "current" | "previous") => (w === "current" ? period.current : period.previous)
+const src = {
+  pair: (w: "current" | "previous", a: string, b: string) => `Orders with ${name(a)} and ${name(b)}, ${inWeek(w)}`,
+  product: (w: "current" | "previous", id: string) => `Orders with ${name(id)}, ${inWeek(w)}`,
+}
+
+/** "fewer than 1 in 4", "fewer than half" … for an attach rate. */
+function share(r: number) {
+  if (r < 0.25) return "fewer than 1 in 4"
+  if (r < 1 / 3) return "fewer than 1 in 3"
+  if (r < 0.5) return "fewer than half"
+  return `${fmt.pct(r)} of them`
+}
+
+function headline(): Segment[] {
+  const cur = sum(revenue.current)
+  const prev = sum(revenue.previous)
+  const change = cur / (prev || 1) - 1
+  const beat = revenue.current.filter((v, i) => v > revenue.previous[i]).length
+  const all = [...revenue.previous, ...revenue.current]
+  const best = all.indexOf(Math.max(...all))
+  const days =
+    beat === 7 ? "Every day beat the same day last week" : beat === 0 ? "No day beat the same day last week" : `${beat} of 7 days beat the same day last week`
+  const bestDay = best >= 7 ? `, and ${weekdayLong(week.days[best - 7].id)} was the best day in two weeks.` : "."
+  return [
+    `Revenue ${change >= 0 ? "rose" : "fell"} `,
+    { value: fmt.change(change), source: `Revenue, ${period.current} vs ${period.previous}` },
+    " to ",
+    { value: fmt.money(cur), source: `Revenue, ${period.current}` },
+    `. ${days}${bestDay}`,
+  ]
+}
+
+// Pairs worth talking about: the 90-day network's pairs (bought together more than chance).
+const known = baseNetwork().edges
+const moves = known
+  .map((e) => ({ e, now: together("current", e.source, e.target), before: together("previous", e.source, e.target) }))
+  .map((m) => ({ ...m, delta: m.now - m.before }))
+
+function risingPoint(): Segment[] | null {
+  const up = [...moves].filter((m) => m.delta > 0).sort((a, b) => b.delta - a.delta)[0]
+  if (!up) return null
+  const { e } = up
+  return [
+    `${name(e.source)} and ${name(e.target)} were bought together in `,
+    { value: fmt.int(up.now), source: src.pair("current", e.source, e.target) },
+    " orders, up from ",
+    { value: fmt.int(up.before), source: src.pair("previous", e.source, e.target) },
+    ".",
+  ]
+}
+
+function fallingPoint(): Segment[] | null {
+  const down = [...moves].filter((m) => m.delta < 0).sort((a, b) => a.delta - b.delta)[0]
+  if (!down) return null
+  // The product people came for is the one with more orders; the pair lost its partner.
+  const [anchor, partner] = soldIn("current", down.e.source) >= soldIn("current", down.e.target) ? [down.e.source, down.e.target] : [down.e.target, down.e.source]
+  const anchorUp = soldIn("current", anchor) >= soldIn("previous", anchor)
+  return [
+    `${name(anchor)} sold ${anchorUp ? "more" : "less"}, but only `,
+    { value: fmt.int(down.now), source: src.pair("current", anchor, partner) },
+    ` orders included ${name(partner)}, down from `,
+    { value: fmt.int(down.before), source: src.pair("previous", anchor, partner) },
+    `. Check whether ${name(partner)} was in stock.`,
+  ]
+}
+
+/** A strong pair (lift ≥ 2.5 over 90 days) that few of the anchor's orders include this week. */
+const opportunity = known
+  .filter((e) => e.lift >= 2.5)
+  .map((e) => {
+    const [anchor, addon] = soldIn("current", e.source) >= soldIn("current", e.target) ? [e.source, e.target] : [e.target, e.source]
+    const anchorOrders = soldIn("current", anchor)
+    return { anchor, addon, anchorOrders, both: together("current", anchor, addon) }
+  })
+  .filter((o) => o.anchorOrders >= 30)
+  .sort((a, b) => a.both / a.anchorOrders - b.both / b.anchorOrders)[0]
+
+function opportunityPoint(): Segment[] | null {
+  if (!opportunity) return null
+  const { anchor, addon, anchorOrders, both } = opportunity
+  const community = productById[anchor]?.community
+  const basket = community != null ? `the ${communityLabel(community)} basket` : "the basket"
+  return [
+    `${name(addon)} went into `,
+    { value: fmt.int(both), source: src.pair("current", anchor, addon) },
+    " of ",
+    { value: fmt.int(anchorOrders), source: src.product("current", anchor) },
+    ` ${name(anchor)} orders, ${share(both / anchorOrders)}. A ${name(addon)} discount with ${name(anchor)} could grow ${basket}.`,
+  ]
+}
+
+const points = (
+  [
+    ["rising", risingPoint()],
+    ["falling", fallingPoint()],
+    ["opportunity", opportunityPoint()],
+  ] as [Signal, Segment[] | null][]
+)
+  .filter(([, text]) => text)
+  .map(([signal, text]) => ({ signal, text: text! }))
+
+const draftCommunity = opportunity ? productById[opportunity.anchor]?.community : null
+const draftLabel = draftCommunity != null ? communityLabel(draftCommunity) : null
+
 export const overview = {
   kind: "Generated overview",
   asOf: `Data as of ${period.asOf}`,
-  headline: [
-    "Revenue rose ",
-    { value: "4.2%", source: `Revenue, ${period.current} vs ${period.previous}` },
-    " to ",
-    { value: "$48,210", source: `Revenue, ${period.current}` },
-    ". Every day beat the same day last week, and Saturday was the best day in two weeks.",
-  ] satisfies Segment[],
+  headline: headline(),
   signals: { rising: "Rising", falling: "Falling", opportunity: "Opportunity" } satisfies Record<Signal, string>,
-  points: [
-    {
-      signal: "rising",
-      text: [
-        "Game day carried Saturday. Tortilla Chips and Salsa were bought together in ",
-        { value: "58", source: `Orders with both, ${period.current}` },
-        " orders, up from ",
-        { value: "39", source: `Orders with both, ${period.previous}` },
-        ".",
-      ],
-    },
-    {
-      signal: "falling",
-      text: [
-        "Ground Coffee sold more, but only ",
-        { value: "21", source: `Orders with Ground Coffee and Coffee Filters, ${period.current}` },
-        " orders included Coffee Filters, down from ",
-        { value: "30", source: `Orders with Ground Coffee and Coffee Filters, ${period.previous}` },
-        ". Check whether the filters were in stock.",
-      ],
-    },
-    {
-      signal: "opportunity",
-      text: [
-        "Parmesan went into ",
-        { value: "31", source: `Orders with Spaghetti and Parmesan, ${period.current}` },
-        " of ",
-        { value: "132", source: `Orders with Spaghetti, ${period.current}` },
-        " Spaghetti orders, fewer than 1 in 4. A Parmesan discount with pasta could grow the Pasta night basket.",
-      ],
-    },
-  ] satisfies { signal: Signal; text: Segment[] }[],
-  primary: { label: "Draft a Pasta night discount", href: "#/ask?q=Design%20a%20discount%20campaign%20for%20Pasta%20night" },
+  points,
+  primary: draftLabel
+    ? { label: `Draft a ${draftLabel} discount`, href: appHref("ask", { q: `Design a discount campaign for ${draftLabel}` }) }
+    : { label: "Draft a campaign", href: appHref("ask", { q: "Which pair should I discount?" }) },
   secondary: { label: "Ask a follow-up", href: "#/ask" },
 }
 
 /* ---------- Top sellers ---------- */
 
+const ranked = [...week.sales.current.entries()].sort((a, b) => b[1].revenue - a[1].revenue).slice(0, 5)
+
 export const topSellers = {
   title: "Top sellers",
   subtitle: `By revenue, ${period.current}`,
   listLabel: "Top five products by revenue",
-  items: [
-    { id: "coffee", name: "Ground Coffee", community: 1, revenue: 3120, change: 0.061 },
-    { id: "milk", name: "Whole Milk", community: 0, revenue: 2480, change: 0.018 },
-    { id: "eggs", name: "Eggs (12)", community: 0, revenue: 1960, change: -0.032 },
-    { id: "chips", name: "Tortilla Chips", community: 3, revenue: 1410, change: 0.184 },
-    { id: "parmesan", name: "Parmesan", community: 2, revenue: 1180, change: 0.041 },
-  ],
+  items: ranked.map(([id, s]) => ({
+    id,
+    name: name(id),
+    community: productById[id]?.community ?? null,
+    revenue: s.revenue,
+    change: s.revenue / (week.sales.previous.get(id)?.revenue || s.revenue) - 1,
+  })),
   vsPrevious: `Changes vs ${period.previous}`,
   link: { label: "See all products", href: "#/products" },
 }

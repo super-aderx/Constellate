@@ -1,3 +1,5 @@
+import { LAST_DATA_DAY } from "@/data/store"
+import { shortDate } from "@/lib/dates"
 import { fmt } from "@/lib/format"
 
 /** Products page copy. */
@@ -5,7 +7,7 @@ import { fmt } from "@/lib/format"
 export const page = {
   title: "Products",
   summary: (store: string, count: number) =>
-    `${count} products at ${store}. Sales over the 12 weeks to Sep 26; pairs over the 90 days to Sep 26.`,
+    `${count} products at ${store}. Sales over the 12 weeks to ${shortDate(LAST_DATA_DAY)}; pairs over the 90 days to ${shortDate(LAST_DATA_DAY)}.`,
 }
 
 export const toolbar = {
@@ -37,7 +39,7 @@ export const detail = {
   revenue: "Revenue, 12 weeks",
   units: "Units, 12 weeks",
   share: "In orders",
-  shareNote: "Share of all orders, last 12 weeks",
+  shareNote: "Share of all orders, last 90 days",
   change: "Last 4 weeks",
   weekly: "Weekly revenue",
   weeksLabel: "Week to read out",

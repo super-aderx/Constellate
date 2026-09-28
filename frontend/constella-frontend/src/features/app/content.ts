@@ -22,17 +22,25 @@ export const shellLabels: AppShellLabels = {
   closeMenu: "Close menu",
 }
 
-/** Mock account until sign-in exists. */
+/** Mock account until sign-in exists. The store's name comes from the API. */
 export const account = {
   name: "Dana Reyes",
   firstName: "Dana",
   initials: "DR",
-  store: "Harbor Street Market",
 }
 
 export const dataStatus = {
-  label: "Data up to date",
-  detail: "Refreshed today at 06:00",
+  loading: { label: "Checking data", detail: "Connecting to the warehouse" },
+  ready: (through: string, refreshed: string) => ({ label: `Data through ${through}`, detail: `Refreshed ${refreshed}` }),
+  error: { label: "Data unavailable", detail: "Can't reach the Constella API" },
+}
+
+/** Shown while a page's data loads, and when it can't. */
+export const pageStatus = {
+  loading: "Loading your store's data…",
+  errorTitle: "Your store's data didn't load",
+  errorBody: "Constella couldn't get the data from its API. Check that the API and the warehouse are running, then try again.",
+  retry: "Try again",
 }
 
 /** Browser tab title for the business report, which isn't in the sidebar. */

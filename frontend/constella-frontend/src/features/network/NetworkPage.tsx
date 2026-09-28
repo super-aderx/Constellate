@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import {
   communities,
   communityLabel,
+  featuredProduct,
   periodById,
   periods,
   productById,
@@ -42,7 +43,7 @@ export function NetworkPage({ params }: { params: URLSearchParams }) {
   const [view, setView] = useState<View>(initialView && VIEWS.includes(initialView) ? initialView : "pairs")
   const [periodId, setPeriodId] = useState<PeriodId>("90d")
   const [segmentId, setSegmentId] = useState<SegmentId>("all")
-  const [chosen, setChosen] = useState<string[]>(initialProduct && productById[initialProduct] ? [initialProduct] : ["coffee"])
+  const [chosen, setChosen] = useState<string[]>(initialProduct && productById[initialProduct] ? [initialProduct] : [featuredProduct])
   const [selection, setSelection] = useState<GraphSelection>(null)
   const [highlight, setHighlight] = useState<number | null>(null)
   const narrow = useMediaQuery("(max-width: 767px)")
