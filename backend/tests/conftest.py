@@ -23,3 +23,16 @@ def client():
 
     with TestClient(app) as c:
         yield c
+
+
+@pytest.fixture
+def fake_llm():
+    """A FakeLLM that routes receive in place of the real model client, for one test."""
+    from app.ai.llm import get_llm
+    from app.main import app
+    from tests.fake_llm import FakeLLM
+
+    fake = FakeLLM()
+    app.dependency_overrides[get_llm] = lambda: fake
+    yield fake
+    app.dependency_overrides.pop(get_llm, None)
