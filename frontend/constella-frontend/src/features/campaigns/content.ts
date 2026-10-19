@@ -175,4 +175,6 @@ export const board = {
   loadError: "Couldn't load campaigns.",
   retry: "Try again",
   actionError: "Couldn't update the campaign. It's unchanged.",
+  /** 409 or 404: someone else changed (or removed) it; the board then refreshes. */
+  staleError: "This campaign was changed elsewhere. It now shows its current status.",
 }

@@ -32,3 +32,27 @@ export function canActivate(status: ApiCampaignStatus, pending: boolean): boolea
 export function canClose(status: ApiCampaignStatus, pending: boolean): boolean {
   return status !== "closed" && !pending
 }
+
+/** The list with `updated` in its place (same order); unchanged if its id isn't there. */
+export function replaceCampaign(campaigns: readonly ApiCampaign[], updated: ApiCampaign): ApiCampaign[] {
+  return campaigns.map((c) => (c.id === updated.id ? updated : c))
+}
+
+/**
+ * How a failed activate or close should be handled. "stale": the board is out of date (409, the
+ * status changed elsewhere; 404, the campaign is gone), so refresh it. "failed": anything else
+ * (unreachable, 5xx …), so the card simply stays as it was. Reads `status` instead of checking
+ * for ApiError, which would import api.ts and keep this module from running under plain Node.
+ */
+export function actionFailure(error: unknown): "stale" | "failed" {
+  const status = (error as { status?: unknown } | null)?.status
+  return status === 409 || status === 404 ? "stale" : "failed"
+}
+
+/** A new set with `id` added or removed, so React sees the change. */
+export function withPending(pending: ReadonlySet<string>, id: string, on: boolean): ReadonlySet<string> {
+  const next = new Set(pending)
+  if (on) next.add(id)
+  else next.delete(id)
+  return next
+}
