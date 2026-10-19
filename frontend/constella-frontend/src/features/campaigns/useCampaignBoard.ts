@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { api, type ApiCampaign } from "@/data/api"
-import { actionFailure, replaceCampaign, withPending } from "./board"
+import { actionFailure, refreshUntilStable, replaceCampaign, withPending } from "./board"
 import { board } from "./content"
 
 /**
@@ -29,6 +29,9 @@ export function useCampaignBoard(): {
   // Campaign ids with an activate or close in flight; their cards' actions are disabled.
   const [pending, setPending] = useState<ReadonlySet<string>>(() => new Set())
   const mounted = useRef(true)
+  // Successful activates and closes so far; a background refresh that sees it change mid-flight
+  // may hold a snapshot older than that action, so it fetches again (refreshUntilStable).
+  const revision = useRef(0)
   useEffect(() => {
     mounted.current = true
     return () => {
@@ -60,13 +63,15 @@ export function useCampaignBoard(): {
   }, [])
 
   // The board is out of date (409/404): fetch it again behind the cards, with no loading state.
-  // If that fails too, the cards and the notice stay as they are.
+  // The notice waits for the outcome, so it only says the board is current once it is.
   const refresh = useCallback(async () => {
-    try {
-      const campaigns = await api.campaigns.list()
-      if (mounted.current) updateCampaigns(() => campaigns)
-    } catch {
-      // Keep what's on screen; the notice already says the campaign changed.
+    const campaigns = await refreshUntilStable(api.campaigns.list, () => revision.current)
+    if (!mounted.current) return
+    if (campaigns) {
+      updateCampaigns(() => campaigns)
+      setNotice({ tone: "error", text: board.staleError })
+    } else {
+      setNotice({ tone: "error", text: board.staleRefreshFailed })
     }
   }, [updateCampaigns])
 
@@ -75,13 +80,13 @@ export function useCampaignBoard(): {
       setPending((p) => withPending(p, id, true))
       try {
         const updated = await call(id)
+        revision.current += 1
         if (!mounted.current) return
         updateCampaigns((campaigns) => replaceCampaign(campaigns, updated))
         setNotice(null)
       } catch (e) {
         if (!mounted.current) return
         if (actionFailure(e) === "stale") {
-          setNotice({ tone: "error", text: board.staleError })
           await refresh()
         } else {
           setNotice({ tone: "error", text: board.actionError })

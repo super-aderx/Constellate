@@ -56,3 +56,27 @@ export function withPending(pending: ReadonlySet<string>, id: string, on: boolea
   else next.delete(id)
   return next
 }
+
+/**
+ * Fetches the list for a background refresh, but only returns a snapshot no action has
+ * overtaken: `revision()` counts successful activates and closes, and a fetch that saw it change
+ * may have read the server before that action, so it's dropped and tried again. Null when every
+ * try was overtaken or the fetch failed; then the caller keeps what's on screen.
+ */
+export async function refreshUntilStable(
+  fetchList: () => Promise<ApiCampaign[]>,
+  revision: () => number,
+  maxTries = 3,
+): Promise<ApiCampaign[] | null> {
+  for (let i = 0; i < maxTries; i++) {
+    const before = revision()
+    let campaigns: ApiCampaign[]
+    try {
+      campaigns = await fetchList()
+    } catch {
+      return null
+    }
+    if (revision() === before) return campaigns
+  }
+  return null
+}

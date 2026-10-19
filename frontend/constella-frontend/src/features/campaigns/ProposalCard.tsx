@@ -64,19 +64,22 @@ export function ProposalCard({
         </div>
       </dl>
 
-      <div className="mt-auto flex flex-wrap gap-2 pt-1">
-        <Button type="button" className={button} disabled={!canActivate(c.status, pending)} onClick={onActivate}>
-          {board.actions.activate}
-        </Button>
-        <Button type="button" variant="secondary" className={button} disabled={!canClose(c.status, pending)} onClick={() => setConfirming(true)}>
-          {board.actions.close}
-        </Button>
-        <Button type="button" variant="ghost" className={button} onClick={onManage}>
-          {board.actions.manage}
-        </Button>
-      </div>
-
+      {/* Close is the dialog's trigger, so closing the dialog puts keyboard focus back on it. */}
       <AlertDialog.Root open={confirming} onOpenChange={setConfirming}>
+        <div className="mt-auto flex flex-wrap gap-2 pt-1">
+          <Button type="button" className={button} disabled={!canActivate(c.status, pending)} onClick={onActivate}>
+            {board.actions.activate}
+          </Button>
+          <AlertDialog.Trigger asChild>
+            <Button type="button" variant="secondary" className={button} disabled={!canClose(c.status, pending)}>
+              {board.actions.close}
+            </Button>
+          </AlertDialog.Trigger>
+          <Button type="button" variant="ghost" className={button} onClick={onManage}>
+            {board.actions.manage}
+          </Button>
+        </div>
+
         <AlertDialog.Portal>
           <AlertDialog.Overlay className="fixed inset-0 z-40 bg-sky/40 data-[state=open]:animate-in data-[state=open]:fade-in-0 motion-reduce:animate-none" />
           <AlertDialog.Content className="fixed top-1/2 left-1/2 z-50 w-[min(26rem,calc(100vw-2rem))] -translate-1/2 rounded-2xl bg-surface-raised p-6 text-ink shadow-pop data-[state=open]:animate-in data-[state=open]:zoom-in-95 motion-reduce:animate-none">
