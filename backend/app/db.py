@@ -26,10 +26,12 @@ def close_pool() -> None:
 
 @dataclass(frozen=True)
 class Db:
-    """A connection inside the request's transaction, and the tenant it's scoped to."""
+    """A connection inside the request's transaction, and the tenant it's scoped to (by id in the
+    warehouse, by key in the app database)."""
 
     conn: psycopg.Connection
     tenant_id: UUID
+    tenant_key: str
 
 
 def get_db(x_tenant_key: Annotated[str | None, Header()] = None) -> Iterator[Db]:
@@ -45,7 +47,7 @@ def get_db(x_tenant_key: Annotated[str | None, Header()] = None) -> Iterator[Db]
             raise HTTPException(status_code=404, detail=f"Unknown tenant: {key}")
         # set_config, not SET LOCAL, because SET can't take a bind parameter.
         conn.execute("select set_config('app.tenant_id', %s, true)", (str(row[0]),))
-        yield Db(conn, row[0])
+        yield Db(conn, row[0], key)
 
 
 DbDep = Annotated[Db, Depends(get_db)]

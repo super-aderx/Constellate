@@ -24,6 +24,9 @@ class Settings:
     ai_model: str | None = None
     # AI requests per store per local day.
     ai_daily_limit: int = 50
+    # The app database (read/write): what Constellate owns itself, such as campaigns. Optional, so
+    # the warehouse endpoints work without it; app_db answers 503 until it's set.
+    app_database_url: str | None = None
 
     @property
     def ai_enabled(self) -> bool:
@@ -41,4 +44,5 @@ def settings() -> Settings:
         openai_api_key=os.environ.get("OPENAI_API_KEY") or None,
         ai_model=os.environ.get("CONSTELLA_AI_MODEL") or None,
         ai_daily_limit=int(os.environ.get("CONSTELLA_AI_DAILY_LIMIT") or 50),
+        app_database_url=os.environ.get("APP_DATABASE_URL") or None,
     )

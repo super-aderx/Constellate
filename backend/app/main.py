@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.api.v1 import router as v1_router
+from app.app_db import close_app_pool
 from app.db import close_pool
 
 
@@ -10,6 +11,7 @@ from app.db import close_pool
 async def lifespan(_: FastAPI):
     yield
     close_pool()
+    close_app_pool()
 
 
 app = FastAPI(title="Constellate API", version="0.2.0", lifespan=lifespan)

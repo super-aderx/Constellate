@@ -1,3 +1,4 @@
+import type { ApiCampaignStatus } from "@/data/api"
 import type { CampaignStatus } from "@/data/campaigns"
 import { fmt } from "@/lib/format"
 
@@ -133,4 +134,45 @@ export const endDialog = {
   body: "The offer stops today and can't be restarted. Its results stay here.",
   cancel: "Keep it running",
   confirm: "End campaign",
+}
+
+/** The campaign board: Constella AI proposals from the app database. */
+export const board = {
+  title: "Campaigns",
+  summary: "Proposals from Constella AI. Activate the ones worth running and close the ones that are done.",
+  tabs: {
+    label: "Show",
+    all: "All",
+    proposed: "Proposed",
+    active: "Active",
+    closed: "Closed",
+  },
+  status: { proposed: "Proposed", active: "Active", closed: "Closed" } satisfies Record<ApiCampaignStatus, string>,
+  card: {
+    products: "Products",
+    slogan: "Slogan",
+    discount: (pct: number) => `${pct}% off`,
+    code: "Discount code",
+    segment: "Target customers",
+  },
+  actions: {
+    activate: "Activate",
+    close: "Close",
+    manage: "Manage",
+  },
+  closeDialog: {
+    title: (name: string) => `Close ${name}?`,
+    body: "The campaign stops and can't be reopened.",
+    cancel: "Keep it",
+    confirm: "Close campaign",
+  },
+  comingSoon: "Campaign management is coming soon.",
+  loading: "Loading campaigns…",
+  empty: {
+    all: "No campaigns yet. Constella AI's proposals will show up here.",
+    filtered: (tab: string) => `No ${tab.toLowerCase()} campaigns.`,
+  },
+  loadError: "Couldn't load campaigns.",
+  retry: "Try again",
+  actionError: "Couldn't update the campaign. It's unchanged.",
 }

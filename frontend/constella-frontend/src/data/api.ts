@@ -256,6 +256,28 @@ export interface ApiAiStatus {
   remaining: number
 }
 
+/** A campaign proposal from the app database (not the in-memory mock in `campaigns.ts`). */
+export type ApiCampaignStatus = "proposed" | "active" | "closed"
+
+export interface ApiCampaignProduct {
+  sku: string
+  name: string
+}
+
+export interface ApiCampaign {
+  id: string
+  title: string
+  /** At least one, in proposal order. */
+  products: ApiCampaignProduct[]
+  slogan: string
+  /** 1–100. */
+  discount_pct: number
+  discount_code: string
+  target_segment: string
+  status: ApiCampaignStatus
+  created_at: string
+}
+
 /* ---------- Endpoints ---------- */
 
 async function allProducts() {
@@ -281,5 +303,13 @@ export const api = {
     status: () => get<ApiAiStatus>("/ai/status"),
     ask: (body: ApiAskRequest, signal?: AbortSignal) => post<ApiAskAnswer>("/ai/ask", body, { signal }),
     report: (body: ApiReportRequest, signal?: AbortSignal) => post<ApiReportText>("/ai/report", body, { signal }),
+  },
+  campaigns: {
+    /** Newest first. */
+    list: () => get<ApiCampaign[]>("/campaigns"),
+    /** 409 `invalid_transition` unless the campaign is proposed. */
+    activate: (id: string) => post<ApiCampaign>(`/campaigns/${encodeURIComponent(id)}/activate`, {}),
+    /** 409 `invalid_transition` if it's closed already. */
+    close: (id: string) => post<ApiCampaign>(`/campaigns/${encodeURIComponent(id)}/close`, {}),
   },
 }

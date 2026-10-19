@@ -10,7 +10,7 @@ The data comes from the **warehouse**, which lives in its own repo, [constella-d
 
 The serving contract is the boundary between the two repos: Constellate never builds, checks out or tests the data platform, and the data platform tests its own side. The API tests run against `backend/tests/warehouse_fixture.py`, a throwaway copy of the contract (the same views, tenant filter and read-only role) filled with two small stores whose baskets come from themed product groups, so tests rely on those themes showing up as communities. When the contract changes, update the fixture's DDL with the code that uses it.
 
-What's still mock: the signed-in account, campaigns and their results (the warehouse has no promotions until the data platform's P1), and the AI's wording.
+What's still mock: the signed-in account, campaigns and their results (the warehouse has no promotions until the data platform's P1), and the AI's wording. Campaign proposals are moving to Constellate's own **app database** (`app.campaigns`, seeded with mock Constella AI proposals; campaign management MVP, CSA-22): the table and seed exist, the endpoints and the new board are in progress, and the Campaigns page still reads the in-memory mock until then.
 
 ## Setup
 
@@ -19,7 +19,7 @@ brew install uv    # Python package/env manager for backend/
 brew install prek  # git hook runner (Rust rewrite of pre-commit)
 ```
 
-Running the app needs the warehouse running and loaded: follow constella-data-platform's README ("Run it"), which starts it on port 5433. Then `cp backend/.env.example backend/.env`. The tests don't need it (see below).
+Running the app needs the warehouse running and loaded: follow constella-data-platform's README ("Run it"), which starts it on port 5433. Then `cp backend/.env.example backend/.env`. The tests don't need it (see below). Campaigns also need the app database (`APP_DATABASE_URL`): create it once (`docker exec constella-test-pg createdb -U postgres constellate`) and run `uv run --env-file .env python -m app.app_db init` from `backend/` (idempotent; it never resets rows). Without it the API runs and only the app-database endpoints answer 503.
 
 The frontend needs Node 22.12+ (`@rolldown/plugin-babel` requires it) and uses npm (there's a `package-lock.json`; `plan.md` says pnpm, but npm is what's in use).
 
@@ -28,7 +28,7 @@ The frontend needs Node 22.12+ (`@rolldown/plugin-babel` requires it) and uses n
 - Managed with `uv`; dependencies declared in `backend/pyproject.toml`, lockfile in `backend/uv.lock`.
 - Run commands from within `backend/`, e.g. `uv run <command>`.
 - Dev server: `uv run --env-file .env fastapi dev app/main.py` (docs at http://localhost:8000/docs)
-- Tests: `uv run --env-file .env pytest`; single test: `uv run --env-file .env pytest tests/test_api.py::test_communities`. The API tests need `TEST_POSTGRES_URL`, an admin connection to any Postgres 17 (see `.env.example`); they create their own `constella_api_test` database and role there, and are skipped without it. `test_network_service.py` is pure.
+- Tests: `uv run --env-file .env pytest`; single test: `uv run --env-file .env pytest tests/test_api.py::test_communities`. The API tests need `TEST_POSTGRES_URL`, an admin connection to any Postgres 17 (see `.env.example`); they create their own `constella_api_test` database and role there, plus a seeded `constella_app_test` app database (`tests/app_db_fixture.py`, `app_db_url` fixture), and are skipped without it. `test_network_service.py` is pure.
 - Lint: `uv run ruff check --fix`
 - Format: `uv run ruff format`
 
@@ -38,7 +38,8 @@ Requests flow **routes → services → repository**:
 - `app/api/v1/`: HTTP only. Each endpoint takes one Pydantic query-parameter model from `app/schemas.py` (`Annotated[Model, Query()]`); shared validation (start ≤ end, max 366 days) and the `segment` filter (`all` or an RFM segment id) live on `DateRange`, which the other filter models extend. Endpoints: `/store`, `/segments`, `/network` (+ `/communities`, `/centrality`), `/products` (+ `/{sku}`, `/{sku}/neighbors`), `/categories`, `/summary`, `/sales/products`, `/sales/weekly`.
 - `app/services/network.py`: builds a NetworkX graph from edge rows and computes degree, strength (sum of co-orders), Louvain communities (seed 42, ids ordered by size) and betweenness. Communities aren't stored: each response labels them after their two most connected products ("Whole Milk & Eggs"). `build_graph`, `detect_communities` and `community_label` are pure and unit-tested without data.
 - `app/services/sales.py`: store info, segments, products, neighbors (ego network), summary KPIs, sales per product and per week. Money is integer cents up to here; services convert it to decimal dollars (`services/money.py`).
-- `app/repository.py`: the only module that runs SQL, against `serving.*` only. Every query also filters `tenant_id` itself (required, not a backup to the views). `fetch_edges` sums daily pair counts over a date range and computes support, confidence both ways and lift from the summed counts. Ratios are never stored in the warehouse; "all customers" is the sum over segments.
+- `app/app_db/`: Constellate's own read/write **app database** (`APP_DATABASE_URL`), separate from the warehouse so the serving contract stays read-only. `app_pool()` / `get_app_db()` / `AppDbDep` give one transaction per request (503 `app_db_not_configured` when the URL isn't set; `main.py` closes the pool on shutdown). `schema.sql` (`app.campaigns`: a proposal's title, products as a `[{sku, name}]` snapshot, slogan, `discount_pct`, `discount_code`, `target_segment`, `status` proposed/active/closed) and `seed.sql` (7 mock harbor-street proposals, inserted only while the store has none) are applied by `python -m app.app_db init`. Campaigns are scoped by tenant key (`Db.tenant_key`, resolved in `db.py` like the id). Planned (CSA-24): `app_db/campaigns.py` as the only SQL against `app.*`, and `GET /campaigns`, `POST /campaigns/{id}/activate|close`. Response models are `CampaignOut` & co. in `schemas.py`.
+- `app/repository.py`: the only module that runs SQL against the warehouse, `serving.*` only. Every query also filters `tenant_id` itself (required, not a backup to the views). `fetch_edges` sums daily pair counts over a date range and computes support, confidence both ways and lift from the summed counts. Ratios are never stored in the warehouse; "all customers" is the sum over segments.
 - Product ids are SKUs (strings, unique within a store); category ids are UUID strings. `category` is a product's own category, `top_category` its top-level one (what the UI groups by; network nodes carry it as `category`).
 - Omitted date filters default to the 90 days ending at the store's `last_complete_day` (`serving.freshness`), never at the partial day after it. Network endpoints fetch `max_edges + 1` rows to set `meta.truncated`.
 - PageRank is deliberately not used (NetworkX's implementation needs scipy, which isn't a dependency).

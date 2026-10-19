@@ -3,20 +3,29 @@ import os
 import pytest
 from fastapi.testclient import TestClient
 
-from tests import warehouse_fixture
+from tests import app_db_fixture, warehouse_fixture
 
 
 @pytest.fixture(scope="session")
-def client():
-    """The API against a throwaway copy of the serving contract (tests/warehouse_fixture.py).
-
-    TEST_POSTGRES_URL is an admin connection to any Postgres 17 server; the tests create their own
-    database and read-only role there and never touch other databases.
-    """
+def app_db_url():
+    """A throwaway app database (tests/app_db_fixture.py), seeded, for tests that query it."""
     admin_url = os.environ.get("TEST_POSTGRES_URL")
     if not admin_url:
         pytest.skip("TEST_POSTGRES_URL is not set; see backend/.env.example")
+    return app_db_fixture.build(admin_url)
+
+
+@pytest.fixture(scope="session")
+def client(app_db_url):
+    """The API against a throwaway copy of the serving contract (tests/warehouse_fixture.py)
+    and a throwaway app database.
+
+    TEST_POSTGRES_URL is an admin connection to any Postgres 17 server; the tests create their own
+    databases and read-only role there and never touch other databases.
+    """
+    admin_url = os.environ["TEST_POSTGRES_URL"]
     os.environ["DATABASE_URL"] = warehouse_fixture.build(admin_url)
+    os.environ["APP_DATABASE_URL"] = app_db_url
     os.environ["CONSTELLA_DEFAULT_TENANT"] = "harbor-street"
 
     from app.main import app
