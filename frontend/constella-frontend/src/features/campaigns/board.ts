@@ -32,3 +32,81 @@ export function canActivate(status: ApiCampaignStatus, pending: boolean): boolea
 export function canClose(status: ApiCampaignStatus, pending: boolean): boolean {
   return status !== "closed" && !pending
 }
+
+/** The list with `updated` in its place (same order); unchanged if its id isn't there. */
+export function replaceCampaign(campaigns: readonly ApiCampaign[], updated: ApiCampaign): ApiCampaign[] {
+  return campaigns.map((c) => (c.id === updated.id ? updated : c))
+}
+
+/**
+ * How a failed activate or close should be handled. "stale": the board is out of date (409, the
+ * status changed elsewhere; 404, the campaign is gone), so refresh it. "failed": anything else
+ * (unreachable, 5xx …), so the card simply stays as it was. Reads `status` instead of checking
+ * for ApiError, which would import api.ts and keep this module from running under plain Node.
+ */
+export function actionFailure(error: unknown): "stale" | "failed" {
+  const status = (error as { status?: unknown } | null)?.status
+  return status === 409 || status === 404 ? "stale" : "failed"
+}
+
+/** A new set with `id` added or removed, so React sees the change. */
+export function withPending(pending: ReadonlySet<string>, id: string, on: boolean): ReadonlySet<string> {
+  const next = new Set(pending)
+  if (on) next.add(id)
+  else next.delete(id)
+  return next
+}
+
+/**
+ * Fetches the list for a background refresh, but only returns a snapshot no action has
+ * overtaken: `revision()` counts successful activates and closes, and a fetch that saw it change
+ * may have read the server before that action, so it's dropped and tried again. Null when every
+ * try was overtaken or the fetch failed; then the caller keeps what's on screen.
+ */
+export async function refreshUntilStable(
+  fetchList: () => Promise<ApiCampaign[]>,
+  revision: () => number,
+  maxTries = 3,
+): Promise<ApiCampaign[] | null> {
+  for (let i = 0; i < maxTries; i++) {
+    const before = revision()
+    let campaigns: ApiCampaign[]
+    try {
+      campaigns = await fetchList()
+    } catch {
+      return null
+    }
+    if (revision() === before) return campaigns
+  }
+  return null
+}
+
+export type RefreshOutcome =
+  | { status: "applied"; campaigns: ApiCampaign[] }
+  | { status: "failed" }
+  | { status: "superseded" }
+
+/**
+ * Background refreshes for the board. `noteAction()` counts successful activates and closes, so
+ * each refresh drops snapshots an action overtook (refreshUntilStable). Each `refresh()` also
+ * takes the next generation, and only the newest may report "applied" or "failed": an older
+ * recovery that finishes late can't overwrite a newer one's list or notice ("superseded").
+ */
+export function createRefresher(
+  fetchList: () => Promise<ApiCampaign[]>,
+  maxTries = 3,
+): { refresh(): Promise<RefreshOutcome>; noteAction(): void } {
+  let actions = 0
+  let generation = 0
+  return {
+    noteAction: () => {
+      actions += 1
+    },
+    refresh: async () => {
+      const mine = ++generation
+      const campaigns = await refreshUntilStable(fetchList, () => actions, maxTries)
+      if (mine !== generation) return { status: "superseded" }
+      return campaigns ? { status: "applied", campaigns } : { status: "failed" }
+    },
+  }
+}

@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useRef, useState } from "react"
 import { SegmentedControl } from "@/components/controls/SegmentedControl"
 import { Button } from "@/components/ui/button"
 import type { ApiCampaign } from "@/data/api"
@@ -15,11 +15,15 @@ import { useCampaignBoard } from "./useCampaignBoard"
 export function CampaignBoard() {
   const { state, pending, notice, activate, close, showComingSoon, reload } = useCampaignBoard()
   const [tab, setTab] = useState<BoardTab>("all")
+  // Where focus goes when the focused card leaves the page (closed or activated off this tab).
+  const heading = useRef<HTMLHeadingElement>(null)
 
   return (
     <div className="mx-auto max-w-[88rem] px-4 pt-6 pb-12 md:px-8 md:pt-10">
       <header>
-        <h1 className="text-[clamp(1.75rem,1.4rem+1.4vw,2.5rem)] leading-[1.1] font-bold tracking-[-0.035em]">{board.title}</h1>
+        <h1 ref={heading} tabIndex={-1} className="text-[clamp(1.75rem,1.4rem+1.4vw,2.5rem)] leading-[1.1] font-bold tracking-[-0.035em] outline-none">
+          {board.title}
+        </h1>
         <p className="mt-2 max-w-[60ch] text-[15px] leading-6 text-ink-muted md:text-base">{board.summary}</p>
       </header>
 
@@ -54,6 +58,7 @@ export function CampaignBoard() {
           onActivate={activate}
           onClose={close}
           onManage={showComingSoon}
+          onFocusLost={() => heading.current?.focus()}
         />
       )}
     </div>
@@ -68,6 +73,7 @@ function Ready({
   onActivate,
   onClose,
   onManage,
+  onFocusLost,
 }: {
   campaigns: ApiCampaign[]
   tab: BoardTab
@@ -76,6 +82,7 @@ function Ready({
   onActivate(id: string): void
   onClose(id: string): void
   onManage(): void
+  onFocusLost(): void
 }) {
   const counts = tabCounts(campaigns)
   // In the API's order (newest first); the tab only filters.
@@ -114,6 +121,7 @@ function Ready({
                 onActivate={() => onActivate(c.id)}
                 onClose={() => onClose(c.id)}
                 onManage={onManage}
+                onFocusLost={onFocusLost}
               />
             </li>
           ))}
