@@ -257,3 +257,27 @@ class WeeklySales(BaseModel):
     week_starts: list[date] = Field(description="Oldest first; each week is 7 days")
     end: date
     products: list[WeeklyProductSales]
+
+
+# --- Campaigns (app database) ---
+
+CampaignStatus = Literal["proposed", "active", "closed"]
+
+
+class CampaignProduct(BaseModel):
+    sku: str
+    name: str
+
+
+class CampaignOut(BaseModel):
+    id: UUID
+    title: str
+    products: list[CampaignProduct] = Field(
+        description="At least one, in proposal order"
+    )
+    slogan: str
+    discount_pct: int = Field(ge=1, le=100)
+    discount_code: str
+    target_segment: str
+    status: CampaignStatus
+    created_at: datetime

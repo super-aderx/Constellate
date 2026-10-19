@@ -90,6 +90,13 @@ uv sync
 uv run --env-file .env fastapi dev app/main.py     # http://localhost:8000/docs
 ```
 
+Campaigns live in Constellate's own **app database**, apart from the read-only warehouse. Create it once, in any Postgres 17 (here the test container from "Tests" below), then create its schema and mock campaigns (safe to re-run):
+
+```bash
+docker exec constella-test-pg createdb -U postgres constellate
+uv run --env-file .env python -m app.app_db init    # app database ready: 7 campaigns for harbor-street
+```
+
 **3. Run the web app:**
 
 ```bash
@@ -100,7 +107,7 @@ npm run dev                                         # http://localhost:5173/#/ho
 
 The demo store is **Harbor Street Market**. To see the second demo store, start the web app with `VITE_TENANT_KEY=maple-corner npm run dev`.
 
-**Tests.** The API tests build their own small warehouse in any Postgres 17 (they never touch your data):
+**Tests.** The API tests build their own small warehouse and app database in any Postgres 17 (they never touch your data):
 
 ```bash
 docker run -d --name constella-test-pg -p 5434:5432 -e POSTGRES_PASSWORD=postgres postgres:17
