@@ -13,7 +13,11 @@ const HomePage = lazy(() => import("@/features/home/HomePage").then((m) => ({ de
 const NetworkPage = lazy(() => import("@/features/network/NetworkPage").then((m) => ({ default: m.NetworkPage })))
 const ProductsPage = lazy(() => import("@/features/products/ProductsPage").then((m) => ({ default: m.ProductsPage })))
 const AskPage = lazy(() => import("@/features/ask/AskPage").then((m) => ({ default: m.AskPage })))
-const CampaignsPage = lazy(() => import("@/features/campaigns/CampaignsPage").then((m) => ({ default: m.CampaignsPage })))
+const CampaignBoard = lazy(() => import("@/features/campaigns/CampaignBoard").then((m) => ({ default: m.CampaignBoard })))
+// The mock page from before the board, kept for the `?campaign=` links Constella AI shows after saving a draft.
+const LegacyCampaignsPage = lazy(() =>
+  import("@/features/campaigns/LegacyCampaignsPage").then((m) => ({ default: m.LegacyCampaignsPage })),
+)
 const ReportPage = lazy(() => import("@/features/report/ReportPage").then((m) => ({ default: m.ReportPage })))
 
 /**
@@ -42,7 +46,8 @@ export function AppPage({ route }: { route: string }) {
     network: () => <NetworkPage key={route} params={params} />,
     products: () => <ProductsPage key={route} params={params} />,
     ask: () => <AskPage key={route} params={params} />,
-    campaigns: () => <CampaignsPage key={route} params={params} />,
+    campaigns: () =>
+      params.has("campaign") ? <LegacyCampaignsPage key={route} params={params} /> : <CampaignBoard key={route} />,
     report: () => <ReportPage key={route} params={params} />,
   }
 

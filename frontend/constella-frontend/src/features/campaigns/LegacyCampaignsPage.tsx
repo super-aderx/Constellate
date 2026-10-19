@@ -22,8 +22,12 @@ const inFilter = (c: CampaignRecord, f: Filter) =>
   (f === "planned" && (c.status === "draft" || c.status === "scheduled")) ||
   (f === "ended" && c.status === "ended")
 
-/** Campaigns: live totals, the list, and the selected campaign's detail and results. `?campaign=` opens one. */
-export function CampaignsPage({ params }: { params: URLSearchParams }) {
+/**
+ * The in-memory mock Campaigns page (live totals, the list, a campaign's detail and results), from
+ * before the campaign board. It opens only for `?campaign=` links, which Constella AI shows after
+ * saving a draft; `#/campaigns` itself opens the board (CampaignBoard).
+ */
+export function LegacyCampaignsPage({ params }: { params: URLSearchParams }) {
   const campaigns = useCampaigns()
   const wide = useMediaQuery("(min-width: 1024px)")
   const linked = params.get("campaign")
