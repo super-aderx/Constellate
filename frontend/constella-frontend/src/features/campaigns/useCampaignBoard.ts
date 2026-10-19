@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { api, type ApiCampaign } from "@/data/api"
-import { actionFailure, refreshUntilStable, replaceCampaign, withPending } from "./board"
+import { actionFailure, createRefresher, replaceCampaign, withPending } from "./board"
 import { board } from "./content"
 
 /**
@@ -29,9 +29,9 @@ export function useCampaignBoard(): {
   // Campaign ids with an activate or close in flight; their cards' actions are disabled.
   const [pending, setPending] = useState<ReadonlySet<string>>(() => new Set())
   const mounted = useRef(true)
-  // Successful activates and closes so far; a background refresh that sees it change mid-flight
-  // may hold a snapshot older than that action, so it fetches again (refreshUntilStable).
-  const revision = useRef(0)
+  // One refresher for the board's lifetime: it counts successful actions (so a refresh drops
+  // snapshots they overtook), and only its newest refresh may update the list or notice.
+  const [refresher] = useState(() => createRefresher(() => api.campaigns.list()))
   useEffect(() => {
     mounted.current = true
     return () => {
@@ -65,22 +65,23 @@ export function useCampaignBoard(): {
   // The board is out of date (409/404): fetch it again behind the cards, with no loading state.
   // The notice waits for the outcome, so it only says the board is current once it is.
   const refresh = useCallback(async () => {
-    const campaigns = await refreshUntilStable(api.campaigns.list, () => revision.current)
-    if (!mounted.current) return
-    if (campaigns) {
-      updateCampaigns(() => campaigns)
+    const outcome = await refresher.refresh()
+    // A newer refresh started meanwhile; it owns the list and the notice.
+    if (!mounted.current || outcome.status === "superseded") return
+    if (outcome.status === "applied") {
+      updateCampaigns(() => outcome.campaigns)
       setNotice({ tone: "error", text: board.staleError })
     } else {
       setNotice({ tone: "error", text: board.staleRefreshFailed })
     }
-  }, [updateCampaigns])
+  }, [refresher, updateCampaigns])
 
   const run = useCallback(
     async (id: string, call: (id: string) => Promise<ApiCampaign>) => {
       setPending((p) => withPending(p, id, true))
       try {
         const updated = await call(id)
-        revision.current += 1
+        refresher.noteAction()
         if (!mounted.current) return
         updateCampaigns((campaigns) => replaceCampaign(campaigns, updated))
         setNotice(null)
@@ -95,7 +96,7 @@ export function useCampaignBoard(): {
         if (mounted.current) setPending((p) => withPending(p, id, false))
       }
     },
-    [refresh, updateCampaigns],
+    [refresh, refresher, updateCampaigns],
   )
 
   const activate = useCallback((id: string) => run(id, api.campaigns.activate), [run])

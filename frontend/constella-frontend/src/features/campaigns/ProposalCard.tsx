@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useLayoutEffect, useRef, useState } from "react"
 import { AlertDialog } from "radix-ui"
 import type { ApiCampaign } from "@/data/api"
 import { Button } from "@/components/ui/button"
@@ -16,17 +16,40 @@ export function ProposalCard({
   onActivate,
   onClose,
   onManage,
+  onFocusLost,
 }: {
   campaign: ApiCampaign
   pending: boolean
   onActivate(): void
   onClose(): void
   onManage(): void
+  /** The card is leaving the page while focus is inside it (e.g. closed on the Active tab). */
+  onFocusLost?(): void
 }) {
   const [confirming, setConfirming] = useState(false)
+  const article = useRef<HTMLElement>(null)
+  // Set when Close campaign is chosen: its Close button turns disabled (pending, then closed), so
+  // focus goes to the card instead. Keep it and Escape still return to Close (radix trigger).
+  const confirmed = useRef(false)
+  const focusLost = useRef(onFocusLost)
+  useLayoutEffect(() => {
+    focusLost.current = onFocusLost
+  })
+  // Layout cleanup runs before React removes the card's DOM, while focus is still inside it.
+  useLayoutEffect(() => {
+    const node = article.current
+    return () => {
+      if (node?.contains(document.activeElement)) focusLost.current?.()
+    }
+  }, [])
 
   return (
-    <article aria-labelledby={`campaign-${c.id}`} className="flex w-full flex-col gap-4 rounded-xl bg-surface-raised p-5">
+    <article
+      ref={article}
+      tabIndex={-1}
+      aria-labelledby={`campaign-${c.id}`}
+      className="flex w-full flex-col gap-4 rounded-xl bg-surface-raised p-5 outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+    >
       <header className="flex items-start justify-between gap-3">
         <h2 id={`campaign-${c.id}`} className="text-[17px] leading-6 font-semibold tracking-[-0.01em]">
           {c.title}
@@ -82,7 +105,14 @@ export function ProposalCard({
 
         <AlertDialog.Portal>
           <AlertDialog.Overlay className="fixed inset-0 z-40 bg-sky/40 data-[state=open]:animate-in data-[state=open]:fade-in-0 motion-reduce:animate-none" />
-          <AlertDialog.Content className="fixed top-1/2 left-1/2 z-50 w-[min(26rem,calc(100vw-2rem))] -translate-1/2 rounded-2xl bg-surface-raised p-6 text-ink shadow-pop data-[state=open]:animate-in data-[state=open]:zoom-in-95 motion-reduce:animate-none">
+          <AlertDialog.Content
+            onCloseAutoFocus={(event) => {
+              if (!confirmed.current) return
+              confirmed.current = false
+              event.preventDefault()
+              article.current?.focus()
+            }}
+            className="fixed top-1/2 left-1/2 z-50 w-[min(26rem,calc(100vw-2rem))] -translate-1/2 rounded-2xl bg-surface-raised p-6 text-ink shadow-pop data-[state=open]:animate-in data-[state=open]:zoom-in-95 motion-reduce:animate-none">
             <AlertDialog.Title className="text-[19px] leading-6 font-semibold">{board.closeDialog.title(c.title)}</AlertDialog.Title>
             <AlertDialog.Description className="mt-2 text-[15px] leading-6 text-ink-muted">{board.closeDialog.body}</AlertDialog.Description>
             <div className="mt-6 flex flex-wrap justify-end gap-2">
@@ -92,7 +122,14 @@ export function ProposalCard({
                 </Button>
               </AlertDialog.Cancel>
               <AlertDialog.Action asChild>
-                <Button variant="destructive" className={button} onClick={onClose}>
+                <Button
+                  variant="destructive"
+                  className={button}
+                  onClick={() => {
+                    confirmed.current = true
+                    onClose()
+                  }}
+                >
                   {board.closeDialog.confirm}
                 </Button>
               </AlertDialog.Action>

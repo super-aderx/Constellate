@@ -80,3 +80,33 @@ export async function refreshUntilStable(
   }
   return null
 }
+
+export type RefreshOutcome =
+  | { status: "applied"; campaigns: ApiCampaign[] }
+  | { status: "failed" }
+  | { status: "superseded" }
+
+/**
+ * Background refreshes for the board. `noteAction()` counts successful activates and closes, so
+ * each refresh drops snapshots an action overtook (refreshUntilStable). Each `refresh()` also
+ * takes the next generation, and only the newest may report "applied" or "failed": an older
+ * recovery that finishes late can't overwrite a newer one's list or notice ("superseded").
+ */
+export function createRefresher(
+  fetchList: () => Promise<ApiCampaign[]>,
+  maxTries = 3,
+): { refresh(): Promise<RefreshOutcome>; noteAction(): void } {
+  let actions = 0
+  let generation = 0
+  return {
+    noteAction: () => {
+      actions += 1
+    },
+    refresh: async () => {
+      const mine = ++generation
+      const campaigns = await refreshUntilStable(fetchList, () => actions, maxTries)
+      if (mine !== generation) return { status: "superseded" }
+      return campaigns ? { status: "applied", campaigns } : { status: "failed" }
+    },
+  }
+}
